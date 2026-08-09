@@ -1,11 +1,12 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Cloud, Key, Cpu } from "lucide-react";
+import { Key, Cpu, Network } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { usePolicyModeOptions } from "../../hooks/usePolicy";
 import { InferenceModeSelector } from "../ui/SettingsSection";
 import type { InferenceModeOption } from "../ui/SettingsSection";
 import TranscriptionModelPicker from "../TranscriptionModelPicker";
+import SelfHostedPanel from "../SelfHostedPanel";
 import type { InferenceMode } from "../../types/electron";
 
 export function UploadTranscriptionPanel() {
@@ -28,6 +29,10 @@ export function UploadTranscriptionPanel() {
     uploadCloudTranscriptionBaseUrl,
     setUploadCloudTranscriptionBaseUrl,
     setUploadCloudTranscriptionMode,
+    remoteTranscriptionUrl,
+    setRemoteTranscriptionUrl,
+    remoteTranscriptionModel,
+    setRemoteTranscriptionModel,
   } = useSettingsStore();
   const { modes: transcriptionModes, isModeAllowed } = usePolicyModeOptions<InferenceModeOption>(
     [
@@ -42,6 +47,12 @@ export function UploadTranscriptionPanel() {
         label: t("settingsPage.transcription.modes.local"),
         description: t("settingsPage.transcription.modes.localDesc"),
         icon: <Cpu className="w-4 h-4" />,
+      },
+      {
+        id: "self-hosted",
+        label: t("settingsPage.transcription.modes.selfHosted"),
+        description: t("settingsPage.transcription.modes.selfHostedDesc"),
+        icon: <Network className="w-4 h-4" />,
       },
     ],
     "transcription"
@@ -97,6 +108,16 @@ export function UploadTranscriptionPanel() {
 
       {uploadTranscriptionMode === "providers" && renderTranscriptionPicker("cloud")}
       {uploadTranscriptionMode === "local" && renderTranscriptionPicker("local")}
+
+      {uploadTranscriptionMode === "self-hosted" && (
+        <SelfHostedPanel
+          service="transcription"
+          url={remoteTranscriptionUrl}
+          onUrlChange={setRemoteTranscriptionUrl}
+          model={remoteTranscriptionModel}
+          onModelChange={setRemoteTranscriptionModel}
+        />
+      )}
     </div>
   );
 }
