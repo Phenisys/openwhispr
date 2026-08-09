@@ -3,7 +3,6 @@ import { API_ENDPOINTS } from "../config/constants";
 import i18n, { normalizeUiLanguage } from "../i18n";
 import { ensureAgentNameInDictionary } from "../utils/agentName";
 import { chooseDictionaryStartupAction } from "../helpers/dictionaryStartup";
-import { useStreamingProvidersStore } from "./streamingProvidersStore";
 import logger from "../utils/logger";
 import whisperVadConstants from "../constants/whisperVad.json";
 import type {
@@ -932,13 +931,6 @@ function createSecretSetter(
 
 export const MAX_TRANSLATION_TARGETS = 5;
 
-// Kick the matching cloud push once a local write has landed in SQLite.
-function syncAfterLocalWrite(method: "syncDictionaryNow" | "syncSnippetsNow"): void {
-  void import("../services/SyncService.js").then(({ syncService }) => {
-    if (syncService.canSync()) void syncService[method]();
-  });
-}
-
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
   uiLanguage: normalizeUiLanguage(isBrowser ? localStorage.getItem("uiLanguage") : null),
   useLocalWhisper: readBoolean("useLocalWhisper", false),
@@ -1386,7 +1378,6 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     set({ customDictionary: words });
     window.electronAPI
       ?.setDictionary(words)
-      .then(() => syncAfterLocalWrite("syncDictionaryNow"))
       .catch((err) => {
         logger.warn(
           "Failed to sync dictionary to SQLite",
@@ -1425,7 +1416,6 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
           if (isBrowser) localStorage.setItem("customDictionary", JSON.stringify(stored));
           set({ customDictionary: stored });
         }
-        syncAfterLocalWrite("syncDictionaryNow");
       })
       .catch((err) => {
         logger.warn(
@@ -1447,7 +1437,6 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     set({ snippets });
     window.electronAPI
       ?.setSnippets?.(snippets)
-      .then(() => syncAfterLocalWrite("syncSnippetsNow"))
       .catch((err) => {
         logger.warn(
           "Failed to sync snippets to SQLite",
@@ -2010,10 +1999,9 @@ export interface ResolvedMeetingTranscription {
 export const selectResolvedMeetingTranscription = (
   state: SettingsState
 ): ResolvedMeetingTranscription => {
-  const catalog = useStreamingProvidersStore.getState().providers;
-  // TODO(1.8.0): Catalog has one cloud entry today (OpenAI Realtime).
-  // When a second is added, resolve as `meetingCloudTranscriptionProvider || cloudTranscriptionProvider || catalog[0]?.id`, then validate against catalog.
-  const cloudTranscriptionProvider = catalog?.[0]?.id ?? "";
+  // Cloud streaming transcription was removed with the account/cloud purge;
+  // meeting transcription is local-only now.
+  const cloudTranscriptionProvider = "";
 
   return {
     useLocalWhisper: state.meetingUseLocalWhisper,

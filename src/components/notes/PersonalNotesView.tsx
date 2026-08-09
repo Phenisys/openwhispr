@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, SquarePen, Search, Sparkles } from "lucide-react";
 import { useToast } from "../ui/useToast";
 import NoteEditor from "./NoteEditor";
-import SpacesTree from "./SpacesTree";
+import LocalNotesTree from "./LocalNotesTree";
 import { ContainerOverview } from "./overview/ContainerOverview";
 import NotesStructureIntroDialog from "./NotesStructureIntroDialog";
 import ActionPicker from "./ActionPicker";
@@ -51,9 +51,6 @@ import {
   setSessionExpectedCount,
 } from "../../stores/meetingRecordingStore";
 import { useNotesOnboarding } from "../../hooks/useNotesOnboarding";
-import { useTeamSpacesCapability } from "../../hooks/useTeamSpacesCapability";
-import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useAuth } from "../../hooks/useAuth";
 import { useTranscriptionContextAllowed } from "../../hooks/usePolicy";
 import NotesOnboarding from "./NotesOnboarding";
 import { isRegenerableNoteTitle } from "../../helpers/regenerableNoteTitle";
@@ -201,8 +198,6 @@ export default function PersonalNotesView({
   const isCloudMode = useSettingsStore(selectIsCloudNoteFormattingMode);
   const effectiveModelId = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
   const { isComplete: isOnboardingComplete, complete: completeOnboarding } = useNotesOnboarding();
-  const { isSignedIn } = useAuth();
-  const teamSpacesAvailable = useTeamSpacesCapability(isSignedIn);
   const isTreeLoading = useIsTreeLoading();
   const [structureIntroPending, setStructureIntroPending] = useState(() =>
     shouldShowIntro(localStorage, NOTES_STRUCTURE_INTRO)
@@ -240,8 +235,6 @@ export default function PersonalNotesView({
     if (
       structureIntroPending &&
       isOnboardingComplete &&
-      isSignedIn &&
-      teamSpacesAvailable &&
       !isTreeLoading &&
       !isSidePanelLayout
     ) {
@@ -250,8 +243,6 @@ export default function PersonalNotesView({
   }, [
     structureIntroPending,
     isOnboardingComplete,
-    isSignedIn,
-    teamSpacesAvailable,
     isTreeLoading,
     isSidePanelLayout,
   ]);
@@ -737,19 +728,9 @@ export default function PersonalNotesView({
             </button>
           </div>
 
-          <SpacesTree
-            onDeleteNote={handleDelete}
-            onMoveNote={handleMoveNote}
-            onCreateFolderAndMove={handleCreateFolderAndMove}
+          <LocalNotesTree
             onNewNote={handleNewNoteIn}
             onShowStructureIntro={() => setShowStructureIntro(true)}
-            onUpgrade={() => onOpenSettings?.("plansBilling")}
-            onOpenWorkspaceBilling={(workspaceId) => {
-              // Settings' billing section shows the ACTIVE workspace, so point
-              // it at the one whose plan blocked the space create first.
-              useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
-              onOpenSettings?.("plansBilling");
-            }}
           />
         </div>
       </div>

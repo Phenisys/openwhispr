@@ -89,10 +89,6 @@ export function removeQueueItem(id: string) {
 
 export function cancelBatch() {
   runId++;
-  if (activeUploadRequestId) {
-    window.electronAPI.cancelUploadTranscription?.(activeUploadRequestId);
-    activeUploadRequestId = null;
-  }
   window.electronAPI.cancelUrlDownload();
   useBatchQueueStore.setState((s) => ({
     isProcessing: false,

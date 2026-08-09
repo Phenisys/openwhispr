@@ -1,6 +1,4 @@
 import { create } from "zustand";
-import { syncService } from "../services/SyncService.js";
-import { resolveRendererCloudNoteCreateBatch } from "../services/noteCreateAck";
 import {
   createClearedAccountNoteState,
   invalidateKeyedLoadGenerations,
@@ -12,9 +10,9 @@ import {
   clearNoteConflicts,
   readNoteConflicts,
   removeNoteConflictId,
+  type CloudNote,
 } from "../lib/noteConflictRegistry";
 import { findDefaultFolder } from "../components/notes/shared";
-import type { CloudNote } from "../services/NotesService.js";
 import type {
   FolderItem,
   NoteAccessState,
@@ -93,16 +91,6 @@ const useNoteStore = create<NoteState>()(() => ({
   noteConflicts: readNoteConflicts(),
 }));
 
-// Drive SyncService's faster pull off the open note. Keyed on activeNoteId (not
-// just open/closed) so switching notes also refreshes, and so account-reset
-// teardown that clears it via setState stops the fast pull too.
-let syncedActiveNoteId: number | null = null;
-useNoteStore.subscribe((state) => {
-  if (state.activeNoteId === syncedActiveNoteId) return;
-  syncedActiveNoteId = state.activeNoteId;
-  syncService.setNoteOpen(state.activeNoteId != null);
-});
-
 let hasBoundIpcListeners = false;
 const DEFAULT_LIMIT = 50;
 let currentLimit = DEFAULT_LIMIT;
@@ -110,8 +98,6 @@ let loadGeneration = 0;
 let treeLoadGeneration = 0;
 let spacesLoadGeneration = 0;
 let foldersLoadGeneration = 0;
-let migrationGeneration = 0;
-let accountGeneration = 0;
 // Folder navigation requested before folders load; consumed once by initializeNotesTree.
 let pendingFolderPreset: number | null = null;
 
@@ -185,15 +171,6 @@ function ensureIpcListeners() {
         if (previous && noteContainerKey(previous) !== noteContainerKey(note)) {
           loadFolders();
         }
-        // Sharing is per-note consent, and so is team-space membership: edits
-        // to a shared or team note must reach the cloud promptly even when
-        // the global backup toggle is off (teammates poll for them). A note
-        // that just LEFT a team also pushes promptly — the server row stays
-        // visible to teammates until its scope retraction lands (D6).
-        const spaceKind = useNoteStore.getState().spaces.find((s) => s.id === note.space_id)?.kind;
-        if (note.is_shared || spaceKind === "team" || (note.left_team && note.cloud_id)) {
-          syncService.debouncedPush("note", note.id);
-        }
       }
     });
     if (typeof dispose === "function") {
@@ -205,9 +182,6 @@ function ensureIpcListeners() {
     const dispose = window.electronAPI.onNoteDeleted(({ id }) => {
       removeNote(id);
       loadFolders();
-      // Push the tombstone right away so a shared link stops serving now,
-      // not at the next ambient pass ("manual" bypasses the throttle).
-      syncService.requestSyncAll("manual");
     });
     if (typeof dispose === "function") {
       disposers.push(dispose);
@@ -371,8 +345,6 @@ export function resetForAccountChange(): void {
   treeLoadGeneration += 1;
   spacesLoadGeneration += 1;
   foldersLoadGeneration += 1;
-  migrationGeneration += 1;
-  accountGeneration += 1;
   pendingFolderPreset = null;
   purgeDisplacedNote = null;
 
@@ -700,7 +672,6 @@ export async function createFolder(
   const result = await window.electronAPI.createFolder(name, spaceId);
   if (result.success && result.folder) {
     await loadFolders();
-    syncService.debouncedPush("folder", result.folder.id);
   }
   return result;
 }
@@ -712,7 +683,6 @@ export async function renameFolder(
   const result = await window.electronAPI.renameFolder(id, name);
   if (result.success) {
     await loadFolders();
-    syncService.debouncedPush("folder", id);
   }
   return result;
 }
@@ -745,7 +715,6 @@ export async function deleteFolder(id: number): Promise<{ success: boolean; erro
       if (notes.length > 0) setActiveNoteId(notes[0].id);
     }
   }
-  syncService.requestSyncAll("manual");
   return result;
 }
 
@@ -766,7 +735,6 @@ export async function moveFolderToSpace(
   if (activeContext?.folderId === folderId && activeContext.spaceId !== spaceId) {
     useNoteStore.setState({ activeContext: { spaceId, folderId } });
   }
-  syncService.requestSyncAll("manual");
   return result;
 }
 
@@ -891,76 +859,6 @@ export function useActiveNote(): NoteItem | null {
   return useNoteStore((state) =>
     state.activeNoteId != null ? findNoteInState(state, state.activeNoteId) : null
   );
-}
-
-export function useMigration(): { total: number; done: number } | null {
-  return useNoteStore((state) => state.migration);
-}
-
-export async function startMigration(): Promise<void> {
-  const gen = ++migrationGeneration;
-  const accountGen = accountGeneration;
-  const allNotes = (await window.electronAPI.getNotes(null, 9999, null)) ?? [];
-  if (gen !== migrationGeneration) return;
-  const unsynced = allNotes.filter((n) => !n.cloud_id);
-  if (unsynced.length === 0) return;
-
-  useNoteStore.setState({ migration: { total: unsynced.length, done: 0 } });
-
-  const { NotesService } = await import("../services/NotesService.js");
-  const CHUNK_SIZE = 50;
-
-  for (let i = 0; i < unsynced.length; i += CHUNK_SIZE) {
-    if (gen !== migrationGeneration) return;
-    const chunk = unsynced.slice(i, i + CHUNK_SIZE);
-    try {
-      const { created } = await NotesService.batchCreate(
-        chunk.map((n) => ({
-          client_note_id: n.client_note_id,
-          title: n.title,
-          content: n.content,
-          enhanced_content: n.enhanced_content,
-          enhancement_prompt: n.enhancement_prompt,
-          note_type: n.note_type,
-          source_file: n.source_file,
-          audio_duration_seconds: n.audio_duration_seconds,
-          created_at: n.created_at,
-          updated_at: n.updated_at,
-        }))
-      );
-      // A reset may invalidate the UI migration while the POST is in flight.
-      // Still run every response through the atomic identity/snapshot guard so
-      // a purged fork is untouched and its proven cloud orphan is cleaned up.
-      await resolveRendererCloudNoteCreateBatch(
-        chunk,
-        created,
-        (cloudId) => NotesService.delete(cloudId),
-        // Migration POSTs intentionally omit transcript/diarization fields,
-        // folder mapping, and space scope. Adopt the id/base but leave the row
-        // pending so SyncService follows with the complete PATCH.
-        {
-          settleIfUnchanged: false,
-          // Starting a newer migration supersedes only this run's progress.
-          // Both runs target the same account and idempotent cloud identity;
-          // only an account reset makes the response an orphan to delete.
-          requestStillCurrent: () => accountGen === accountGeneration,
-        }
-      );
-      if (gen !== migrationGeneration) return;
-      useNoteStore.setState((s) => ({
-        migration: s.migration
-          ? {
-              total: s.migration.total,
-              done: Math.min(s.migration.done + chunk.length, s.migration.total),
-            }
-          : null,
-      }));
-    } catch (err) {
-      console.error("Migration chunk failed:", err);
-    }
-  }
-
-  if (gen === migrationGeneration) useNoteStore.setState({ migration: null });
 }
 
 export function setNoteConflict(clientNoteId: string, cloudNote: CloudNote): void {

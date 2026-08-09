@@ -1,6 +1,5 @@
 import type { ModelDefinition } from "../models/ModelRegistry";
 import type { TinfoilCatalogModel } from "../models/tinfoilModels";
-import type { UsageResponse } from "../lib/usageStore";
 import type { OrgPolicy } from "./policy";
 
 export type LocalTranscriptionProvider = "whisper" | "nvidia";
@@ -1700,84 +1699,6 @@ declare global {
         code?: string;
         messageKey?: string;
       }>;
-      cloudUsage?: () => Promise<
-        UsageResponse & {
-          success: boolean;
-          error?: string;
-          code?: string;
-        }
-      >;
-      cloudCheckout?: (opts?: {
-        plan?: "monthly" | "annual";
-        tier?: "pro" | "business";
-      }) => Promise<{
-        success: boolean;
-        url?: string;
-        error?: string;
-        code?: string;
-      }>;
-      cloudBillingPortal?: () => Promise<{
-        success: boolean;
-        url?: string;
-        error?: string;
-        code?: string;
-      }>;
-      cloudSwitchPlan?: (opts: {
-        plan: "monthly" | "annual";
-        tier: "pro" | "business";
-      }) => Promise<{
-        success: boolean;
-        alreadyOnPlan?: boolean;
-        error?: string;
-      }>;
-      cloudPreviewSwitch?: (opts: {
-        plan: "monthly" | "annual";
-        tier: "pro" | "business";
-      }) => Promise<{
-        success: boolean;
-        immediateAmount?: number;
-        currency?: string;
-        currentPriceAmount?: number;
-        currentInterval?: string;
-        newPriceAmount?: number;
-        newInterval?: string;
-        nextBillingDate?: string;
-        alreadyOnPlan?: boolean;
-        error?: string;
-      }>;
-
-      // Authenticated cloud API proxy (`public: true` skips the auth requirement)
-      cloudApiRequest?: (opts: {
-        method?: string;
-        path: string;
-        body?: unknown;
-        public?: boolean;
-        expectedAuthGeneration?: number;
-      }) => Promise<
-        {
-          success: boolean;
-          data?: unknown;
-        } & PolicyFailureMetadata
-      >;
-
-      // Cloud audio file transcription
-      transcribeAudioFileCloud?: (
-        filePath: string,
-        options?: { requestId?: string }
-      ) => Promise<
-        {
-          success: boolean;
-          text?: string;
-          warning?: string;
-        } & PolicyFailureMetadata
-      >;
-
-      cancelUploadTranscription?: (requestId: string) => Promise<{ success: boolean }>;
-
-      onUploadTranscriptionProgress?: (
-        callback: (data: { stage: string; chunksTotal: number; chunksCompleted: number }) => void
-      ) => () => void;
-
       // BYOK audio file transcription
       transcribeAudioFileByok?: (options: {
         filePath: string;

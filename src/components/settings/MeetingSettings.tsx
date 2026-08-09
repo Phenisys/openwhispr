@@ -9,8 +9,6 @@ import { Toggle } from "../ui/toggle";
 import TranscriptionModelPicker from "../TranscriptionModelPicker";
 import SelfHostedPanel from "../SelfHostedPanel";
 import type { InferenceMode } from "../../types/electron";
-import { useStartOnboarding } from "../../hooks/useStartOnboarding";
-
 export function MeetingSpeakerDetectionRow() {
   const { t } = useTranslation();
   const speakerDiarizationEnabled = useSettingsStore((s) => s.speakerDiarizationEnabled);
@@ -30,10 +28,8 @@ const noop = () => {};
 
 export function MeetingTranscriptionPanel() {
   const { t } = useTranslation();
-  const startOnboarding = useStartOnboarding();
 
   const {
-    isSignedIn,
     meetingTranscriptionMode,
     setMeetingTranscriptionMode,
     setMeetingUseLocalWhisper,
@@ -55,14 +51,6 @@ export function MeetingTranscriptionPanel() {
   } = useSettingsStore();
   const { modes: transcriptionModes, isModeAllowed } = usePolicyModeOptions<InferenceModeOption>(
     [
-      {
-        id: "openwhispr",
-        label: t("settingsPage.transcription.modes.openwhispr"),
-        description: t("settingsPage.transcription.modes.openwhisprDesc"),
-        icon: <Cloud className="w-4 h-4" />,
-        disabled: !isSignedIn,
-        badge: !isSignedIn ? t("common.freeAccountRequired") : undefined,
-      },
       {
         id: "providers",
         label: t("settingsPage.transcription.modes.providers"),
@@ -87,14 +75,10 @@ export function MeetingTranscriptionPanel() {
 
   const handleTranscriptionModeSelect = (mode: InferenceMode) => {
     if (!isModeAllowed(mode)) return;
-    if (mode === "openwhispr" && !isSignedIn) {
-      startOnboarding();
-      return;
-    }
     if (mode === meetingTranscriptionMode) return;
     setMeetingTranscriptionMode(mode);
     setMeetingUseLocalWhisper(mode === "local");
-    setMeetingCloudTranscriptionMode(mode === "openwhispr" ? "openwhispr" : "byok");
+    setMeetingCloudTranscriptionMode("byok");
   };
 
   const handleLocalTranscriptionModelSelect = useCallback(

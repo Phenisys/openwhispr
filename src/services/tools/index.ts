@@ -24,8 +24,7 @@ interface ToolRegistrySettings {
 export function createToolRegistry(settings: ToolRegistrySettings): ToolRegistry {
   const registry = new ToolRegistry();
 
-  const useCloudSearch = settings.isSignedIn && settings.cloudBackupEnabled;
-  registry.register(createSearchNotesTool({ useCloudSearch, fixedScope: settings.searchScope }));
+  registry.register(createSearchNotesTool({ fixedScope: settings.searchScope }));
   registry.register(getNoteTool);
   registry.register(createNoteTool);
   registry.register(updateNoteTool);

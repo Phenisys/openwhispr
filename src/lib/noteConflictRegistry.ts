@@ -1,8 +1,20 @@
-import type { CloudNote } from "../services/NotesService";
-
 // Full cloud snapshots for unresolved conflicts. Persisting only client ids
 // kept the push gate active after relaunch but left the editor with no payload
 // to render or resolve.
+// Cloud sync was removed with the account/cloud purge (2026-08-09); this type
+// is kept so legacy persisted conflicts still typecheck and render.
+export interface CloudNote {
+  client_note_id: string;
+  title: string;
+  created_at: string;
+  note_type: string;
+  score?: number;
+  content?: string;
+  enhanced_content?: string;
+  space_id?: string | null;
+  updated_at?: string | null;
+  updated_by_user_id?: string | null;
+}
 const KEY = "noteConflicts.clientIds";
 
 function readStoredConflicts(): Record<string, CloudNote> {

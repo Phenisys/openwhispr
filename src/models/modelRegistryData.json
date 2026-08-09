@@ -43,7 +43,9 @@
       "size": "631MB",
       "sizeMb": 631,
       "language": "en",
-      "supportedLanguages": ["en"],
+      "supportedLanguages": [
+        "en"
+      ],
       "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-non-streaming.tar.bz2",
       "extractDir": "sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-non-streaming",
       "descriptionKey": "models.descriptions.parakeet.parakeet_unified_en_0_6b"
@@ -54,7 +56,9 @@
       "size": "632MB",
       "sizeMb": 632,
       "language": "en",
-      "supportedLanguages": ["en"],
+      "supportedLanguages": [
+        "en"
+      ],
       "runtime": "online",
       "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-speech-streaming-en-0.6b-560ms-int8-2026-04-25.tar.bz2",
       "extractDir": "sherpa-onnx-nemotron-speech-streaming-en-0.6b-560ms-int8-2026-04-25",
@@ -242,20 +246,6 @@
           "name": "Voxtral Mini",
           "description": "Fast multilingual transcription",
           "descriptionKey": "models.descriptions.transcription.mistral_voxtral_mini_latest"
-        }
-      ]
-    },
-    {
-      "id": "corti",
-      "name": "Corti",
-      "baseUrl": "https://api.us.corti.app/v2",
-      "models": [
-        {
-          "id": "corti-transcribe",
-          "name": "Corti Transcribe",
-          "description": "Clinical-grade medical transcription",
-          "descriptionKey": "models.descriptions.transcription.corti_transcribe",
-          "streaming": true
         }
       ]
     },
@@ -572,44 +562,6 @@
           "supportsTemperature": true,
           "descriptionKey": "models.descriptions.cloud.tinfoil_gemma4_31b",
           "supportsThinking": true
-        }
-      ]
-    },
-    {
-      "id": "corti",
-      "name": "Corti",
-      "models": [
-        {
-          "id": "corti-s1-instant",
-          "name": "Corti S1 Instant",
-          "description": "Fast healthcare model, no reasoning trace",
-          "descriptionKey": "models.descriptions.cloud.corti_corti_s1_instant",
-          "tokenParam": "max_tokens",
-          "supportsTemperature": true
-        },
-        {
-          "id": "corti-s1",
-          "name": "Corti S1",
-          "description": "Most capable clinical model with reasoning",
-          "descriptionKey": "models.descriptions.cloud.corti_corti_s1",
-          "tokenParam": "max_tokens",
-          "supportsTemperature": true
-        },
-        {
-          "id": "corti-s1-mini-instant",
-          "name": "Corti S1 Mini Instant",
-          "description": "Compact healthcare model, fastest and lowest cost",
-          "descriptionKey": "models.descriptions.cloud.corti_corti_s1_mini_instant",
-          "tokenParam": "max_tokens",
-          "supportsTemperature": true
-        },
-        {
-          "id": "corti-s1-mini",
-          "name": "Corti S1 Mini",
-          "description": "Compact clinical model with reasoning at half the price",
-          "descriptionKey": "models.descriptions.cloud.corti_corti_s1_mini",
-          "tokenParam": "max_tokens",
-          "supportsTemperature": true
         }
       ]
     }

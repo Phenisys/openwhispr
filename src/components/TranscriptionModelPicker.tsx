@@ -208,7 +208,6 @@ const CLOUD_PROVIDER_TABS = [
   { id: "groq", name: "Groq" },
   { id: "xai", name: "xAI" },
   { id: "mistral", name: "Mistral" },
-  { id: "corti", name: "Corti" },
   { id: "tinfoil", name: "Tinfoil" },
   { id: "custom", name: "Custom" },
 ];

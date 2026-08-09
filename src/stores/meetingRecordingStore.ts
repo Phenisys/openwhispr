@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { getSettings, selectResolvedMeetingTranscription } from "./settingsStore";
-import { useStreamingProvidersStore } from "./streamingProvidersStore";
 import { isBuiltInMicrophone } from "../utils/audioDeviceUtils";
 import {
   followsSystemDefaultMic,
@@ -134,40 +133,14 @@ const getMeetingTranscriptionOptions = () => {
     };
   }
 
-  // Corti (BYOK) streams over its own WSS — independent of the server-driven catalog.
-  const selectedProvider =
-    state.meetingCloudTranscriptionProvider || state.cloudTranscriptionProvider;
-  if (resolved.cloudTranscriptionMode === "byok" && selectedProvider === "corti") {
-    return {
-      provider: "corti-realtime" as const,
-      model: "corti-transcribe",
-      mode: "byok" as const,
-      language,
-      environment: state.cortiEnvironment,
-      tenant: state.cortiTenant,
-      keyterms: (state.customDictionary ?? []).filter(Boolean),
-    };
-  }
-
-  const catalog = useStreamingProvidersStore.getState().providers;
-  const provider =
-    catalog?.find((p) => p.id === resolved.cloudTranscriptionProvider) ?? catalog?.[0];
-  const byokKeyAvailable = provider?.id === "openai" ? !!state.openaiApiKey : true;
-  const mode =
-    resolved.cloudTranscriptionMode === "byok" && byokKeyAvailable ? "byok" : "openwhispr";
-  if (!provider) {
-    logger.debug(
-      "Streaming providers catalog not loaded, falling back to OpenAI default",
-      {},
-      "meeting"
-    );
-    return { provider: "openai-realtime" as const, model: "gpt-4o-mini-transcribe", mode };
-  }
-  const model =
-    provider.models.find((m) => m.id === resolved.cloudTranscriptionModel)?.id ??
-    provider.models.find((m) => m.default)?.id ??
-    provider.models[0]?.id;
-  return { provider: `${provider.id}-realtime` as const, model, mode };
+  // Cloud streaming transcription was removed with the account/cloud purge.
+  // Fall back to local transcription with sane defaults.
+  return {
+    provider: "local" as const,
+    localProvider: resolved.localTranscriptionProvider || "whisper",
+    localModel: resolved.whisperModel || "base",
+    language,
+  };
 };
 
 const stopMediaStream = (stream: MediaStream | null) => {
