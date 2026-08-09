@@ -1879,7 +1879,8 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     const completionMarker = `__OPENWHISPR_SELECTION_COMPLETE_${crypto.randomUUID()}__`;
     selectionConfig.systemPrompt = buildSelectionEditSystemPrompt(
       config?.systemPrompt,
-      completionMarker
+      completionMarker,
+      resolvePrompt("selectionEdit", { agentName: null })
     );
     const userPrompt = buildSelectionEditUserPrompt(text, capture.text);
 

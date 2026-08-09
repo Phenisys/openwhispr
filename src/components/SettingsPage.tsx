@@ -429,6 +429,32 @@ function NoteFormattingSettings() {
         </SettingsPanelRow>
       </SettingsPanel>
       <InferenceConfigEditor scope="noteFormatting" />
+
+      <div className="border-t border-border/40 pt-6 space-y-6">
+        <div>
+          <SectionHeader
+            title={t("settingsPage.prompts.enhancementTitle")}
+            description={t("settingsPage.prompts.enhancementDescription")}
+          />
+          <PromptStudio kind="noteEnhancement" />
+        </div>
+
+        <div>
+          <SectionHeader
+            title={t("settingsPage.prompts.meetingTitle")}
+            description={t("settingsPage.prompts.meetingDescription")}
+          />
+          <PromptStudio kind="meetingEnhancement" />
+        </div>
+
+        <div>
+          <SectionHeader
+            title={t("settingsPage.prompts.titleGenerationTitle")}
+            description={t("settingsPage.prompts.titleGenerationDescription")}
+          />
+          <PromptStudio kind="titleGeneration" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -3139,6 +3165,20 @@ EOF`,
                     description={t("settingsPage.prompts.description")}
                   />
                   <PromptStudio />
+                </div>
+                <div className="border-t border-border/40 pt-6">
+                  <SectionHeader
+                    title={t("settingsPage.prompts.selectionEditTitle")}
+                    description={t("settingsPage.prompts.selectionEditDescription")}
+                  />
+                  <PromptStudio kind="selectionEdit" />
+                </div>
+                <div className="border-t border-border/40 pt-6">
+                  <SectionHeader
+                    title={t("settingsPage.prompts.toolInstructionsTitle")}
+                    description={t("settingsPage.prompts.toolInstructionsDescription")}
+                  />
+                  <PromptStudio kind="toolInstructions" />
                 </div>
               </div>
             )}

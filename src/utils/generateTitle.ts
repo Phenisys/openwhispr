@@ -1,9 +1,7 @@
 import reasoningService from "../services/ReasoningService";
 import type { ReasoningConfig } from "../services/BaseReasoningService";
 import { getSettings } from "../stores/settingsStore";
-
-const TITLE_SYSTEM_PROMPT =
-  "Generate a concise 3-8 word title for these notes. Return ONLY the title text, nothing else — no quotes, no prefix, no explanation.";
+import { resolvePrompt } from "../config/prompts";
 
 export async function generateNoteTitle(
   text: string,
@@ -12,7 +10,7 @@ export async function generateNoteTitle(
 ): Promise<string> {
   try {
     const raw = await reasoningService.processText(text.slice(0, 2000), modelId, null, {
-      systemPrompt: TITLE_SYSTEM_PROMPT,
+      systemPrompt: resolvePrompt("titleGeneration", { agentName: null }),
       temperature: 0.3,
       disableThinking: getSettings().noteFormattingDisableThinking,
       ...config,

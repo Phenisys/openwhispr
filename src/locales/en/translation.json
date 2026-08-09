@@ -2049,7 +2049,17 @@
     },
     "prompts": {
       "description": "View, customize, and test the unified system prompt that powers text cleanup and instruction detection",
-      "title": "Prompt Studio"
+      "title": "Prompt Studio",
+      "enhancementTitle": "Note Enhancement Prompt",
+      "enhancementDescription": "System prompt for restructuring and polishing raw notes.",
+      "meetingTitle": "Meeting Notes Prompt",
+      "meetingDescription": "System prompt for turning dual-speaker meeting transcripts into clean action notes.",
+      "titleGenerationTitle": "Title Generation Prompt",
+      "titleGenerationDescription": "System prompt used when auto-generating note titles.",
+      "selectionEditTitle": "Selection Editing Prompt",
+      "selectionEditDescription": "System suffix applied when editing a text selection by voice.",
+      "toolInstructionsTitle": "Agent Tool Instructions",
+      "toolInstructionsDescription": "Instructions describing the tools the chat agent can call. Leave empty to keep the per-tool defaults."
     },
     "speechToText": {
       "title": "Speech-to-Text",

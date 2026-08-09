@@ -98,6 +98,12 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
   const isTranslate = kind === "translate";
   const isAgent = kind === "dictationAgent";
 
+  // System prompts without a natural "input → output" test surface
+  // (title generation, selection editing, tool instructions).
+  const canTest = !new Set<PromptKind>(["titleGeneration", "selectionEdit", "toolInstructions"]).has(
+    kind
+  );
+
   const customPrompt = useSettingsStore((s) => s.customPrompts[kind]);
   const setCustomPrompt = useSettingsStore((s) => s.setCustomPrompt);
   const defaultPrompt = getDefaultPromptText(kind, uiLanguage);
@@ -276,6 +282,11 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
       try {
         const result = await ReasoningService.processText(testText, modelToUse, agentName, {
           disableThinking: useSettingsStore.getState().cleanupDisableThinking,
+          // Note/meeting enhancement prompts are resolved by the caller (not
+          // internally like cleanup), so the test must pass them explicitly.
+          ...(kind === "noteEnhancement" || kind === "meetingEnhancement"
+            ? { systemPrompt: resolvePrompt(kind, { agentName, uiLanguage }) }
+            : {}),
         });
         setTestResult(result);
       } finally {
@@ -302,7 +313,7 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
   const tabs = [
     { id: "current" as const, label: t("promptStudio.tabs.view"), icon: Eye },
     { id: "edit" as const, label: t("promptStudio.tabs.customize"), icon: Edit3 },
-    { id: "test" as const, label: t("promptStudio.tabs.test"), icon: TestTube },
+    ...(canTest ? [{ id: "test" as const, label: t("promptStudio.tabs.test"), icon: TestTube }] : []),
   ];
 
   return (

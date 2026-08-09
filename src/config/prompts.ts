@@ -1,4 +1,5 @@
 import { resolvePrompt } from "./prompts/index";
+import { useSettingsStore } from "../stores/settingsStore";
 
 export {
   resolvePrompt,
@@ -46,9 +47,15 @@ export function getAgentSystemPrompt(availableTools?: string[], noteContext?: st
   let prompt = resolvePrompt("chatAgent", { agentName: null });
 
   if (availableTools && availableTools.length > 0) {
-    const toolLines = availableTools.map((name) => TOOL_INSTRUCTIONS[name]).filter(Boolean);
-    if (toolLines.length > 0) {
-      prompt += "\n\nYou have access to tools. " + toolLines.join(" ");
+    // A custom toolInstructions prompt replaces the per-tool map entirely.
+    const customToolPrompt = useSettingsStore.getState().customPrompts.toolInstructions;
+    if (customToolPrompt?.trim()) {
+      prompt += "\n\n" + customToolPrompt.trim();
+    } else {
+      const toolLines = availableTools.map((name) => TOOL_INSTRUCTIONS[name]).filter(Boolean);
+      if (toolLines.length > 0) {
+        prompt += "\n\nYou have access to tools. " + toolLines.join(" ");
+      }
     }
   }
 

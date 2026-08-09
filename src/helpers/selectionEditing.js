@@ -8,11 +8,21 @@ SELECTION EDITING MODE:
 - Output only the complete replacement text. Do not add a preamble, label, quotation marks, code fence, explanation, or alternatives.
 - Never repeat the assistant wake name or spoken command in the output.`;
 
-export function buildSelectionEditSystemPrompt(basePrompt, completionMarker = "") {
+/**
+ * @param {string} [basePrompt] Base agent prompt the suffix is appended to.
+ * @param {string} [completionMarker] Marker the app strips from the output.
+ * @param {string} [selectionEditSuffix] Customizable suffix (PromptStudio
+ *   "selectionEdit"). Defaults to the built-in SELECTION_EDIT_SYSTEM_SUFFIX.
+ */
+export function buildSelectionEditSystemPrompt(
+  basePrompt,
+  completionMarker = "",
+  selectionEditSuffix = SELECTION_EDIT_SYSTEM_SUFFIX
+) {
   const markerInstruction = completionMarker
     ? `\n- Immediately append this exact completion marker after the final replacement character, with no spaces or newline: ${completionMarker}. The desktop app removes this marker before replacing the selection.`
     : "";
-  return `${String(basePrompt ?? "").trim()}${SELECTION_EDIT_SYSTEM_SUFFIX}${markerInstruction}`;
+  return `${String(basePrompt ?? "").trim()}${selectionEditSuffix}${markerInstruction}`;
 }
 
 export function buildSelectionEditUserPrompt(spokenInstruction, selectedText) {
