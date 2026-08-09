@@ -250,7 +250,7 @@ class ReasoningService extends BaseReasoningService {
 
     const response = await withRetry(async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 30000);
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -522,7 +522,7 @@ class ReasoningService extends BaseReasoningService {
 
     this.streamAbortController = new AbortController();
     const controller = this.streamAbortController;
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 60000);
 
     let response: Response;
     try {

@@ -51,7 +51,7 @@ export const tinfoilProvider: InferenceProvider = {
     const response = await withRetry(
       () =>
         client.chat.completions.create(requestBody as any, {
-          timeout: REQUEST_TIMEOUT_MS,
+          timeout: config.timeoutMs ?? REQUEST_TIMEOUT_MS,
           maxRetries: 0,
         }),
       createApiRetryStrategy()

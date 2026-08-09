@@ -521,6 +521,14 @@ export interface SettingsState
   noteFormattingDisableThinking: boolean;
   chatAgentDisableThinking: boolean;
 
+  /** Inference request timeouts per scope (ms). 30 s default, 5 min for local. */
+  cleanupTimeoutMs: number;
+  dictationAgentTimeoutMs: number;
+  noteFormattingTimeoutMs: number;
+  chatAgentTimeoutMs: number;
+  translationTimeoutMs: number;
+  localInferenceTimeoutMs: number;
+
   customPrompts: Record<PromptKind, string>;
   setCustomPrompt: (kind: PromptKind, value: string) => void;
 
@@ -586,6 +594,8 @@ export interface SettingsState
   setDictationAgentDisableThinking: (value: boolean) => void;
   setNoteFormattingDisableThinking: (value: boolean) => void;
   setChatAgentDisableThinking: (value: boolean) => void;
+
+  setLocalInferenceTimeoutMs: (value: number) => void;
 
   setUseLocalWhisper: (value: boolean) => void;
   setWhisperModel: (value: string) => void;
@@ -1321,6 +1331,13 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   noteFormattingDisableThinking: readBoolean("noteFormattingDisableThinking", true),
   chatAgentDisableThinking: readBoolean("chatAgentDisableThinking", true),
 
+  cleanupTimeoutMs: readNumber("cleanupTimeoutMs", 30000),
+  dictationAgentTimeoutMs: readNumber("dictationAgentTimeoutMs", 30000),
+  noteFormattingTimeoutMs: readNumber("noteFormattingTimeoutMs", 30000),
+  chatAgentTimeoutMs: readNumber("chatAgentTimeoutMs", 30000),
+  translationTimeoutMs: readNumber("translationTimeoutMs", 30000),
+  localInferenceTimeoutMs: readNumber("localInferenceTimeoutMs", 300000),
+
   customPrompts: PROMPT_KIND_LIST.reduce(
     (acc, kind) => ({ ...acc, [kind]: readString(`customPrompt.${kind}`, "") }),
     {} as Record<PromptKind, string>
@@ -1344,6 +1361,11 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setDictationAgentDisableThinking: createBooleanSetter("dictationAgentDisableThinking"),
   setNoteFormattingDisableThinking: createBooleanSetter("noteFormattingDisableThinking"),
   setChatAgentDisableThinking: createBooleanSetter("chatAgentDisableThinking"),
+
+  setLocalInferenceTimeoutMs: (value) => {
+    if (isBrowser) localStorage.setItem("localInferenceTimeoutMs", String(value));
+    useSettingsStore.setState({ localInferenceTimeoutMs: value });
+  },
 
   setUseLocalWhisper: createBooleanSetter("useLocalWhisper"),
   setWhisperModel: createStringSetter("whisperModel"),
@@ -2057,6 +2079,7 @@ export interface ResolvedNoteFormatting {
   cloudBaseUrl: string;
   remoteUrl: string;
   customApiKey: string;
+  timeoutMs: number;
 }
 
 export const selectResolvedNoteFormatting = (state: SettingsState): ResolvedNoteFormatting => {
@@ -2080,6 +2103,7 @@ export const selectResolvedNoteFormatting = (state: SettingsState): ResolvedNote
     cloudBaseUrl: cfg.cloudBaseUrl || "",
     remoteUrl: cfg.remoteUrl || "",
     customApiKey: cfg.customApiKey || (borrowsEndpoint ? cleanup.customApiKey || "" : ""),
+    timeoutMs: cfg.timeoutMs,
   };
 };
 
@@ -2093,6 +2117,7 @@ export interface ResolvedLLMConfig {
   remoteUrl?: string;
   customApiKey?: string;
   disableThinking: boolean;
+  timeoutMs: number;
 }
 
 export const selectResolvedLLMConfig = (
@@ -2113,6 +2138,12 @@ export const selectResolvedLLMConfig = (
   const disableThinkingKey = def.storeKeys.disableThinking;
   const disableThinking = disableThinkingKey ? (state[disableThinkingKey] as boolean) : true;
 
+  const timeoutKey = def.storeKeys.timeoutMs;
+  const timeoutMs =
+    (timeoutKey ? (state[timeoutKey] as number | undefined) : undefined) ||
+    fallback?.timeoutMs ||
+    30000;
+
   return {
     scope,
     mode: state[def.storeKeys.mode] as InferenceMode,
@@ -2126,6 +2157,7 @@ export const selectResolvedLLMConfig = (
     // belongs on the request path — see selectResolvedNoteFormatting.
     customApiKey: read("customApiKey"),
     disableThinking,
+    timeoutMs,
   };
 };
 

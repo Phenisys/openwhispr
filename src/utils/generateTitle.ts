@@ -13,6 +13,7 @@ export async function generateNoteTitle(
       systemPrompt: resolvePrompt("titleGeneration", { agentName: null }),
       temperature: 0.3,
       disableThinking: getSettings().noteFormattingDisableThinking,
+      timeoutMs: getSettings().noteFormattingTimeoutMs,
       ...config,
     });
     const cleaned = raw.trim().replace(/^["']|["']$/g, "");

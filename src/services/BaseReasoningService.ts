@@ -16,6 +16,8 @@ export interface ReasoningConfig {
   language?: string;
   requireCompleteOutput?: boolean;
   requiresAgent?: boolean;
+  /** Request timeout in ms. Falls back to the scope default (30 s). */
+  timeoutMs?: number;
 }
 
 export abstract class BaseReasoningService {

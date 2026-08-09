@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
-import { Cloud, Key, Cpu, Network, Building2 } from "lucide-react";
+import { Key, Cpu, Network, Building2, Settings2 } from "lucide-react";
 import {
   useSettingsStore,
   selectResolvedLLMConfig,
@@ -26,13 +26,6 @@ const MODE_LABEL_PREFIX: Record<InferenceScope, string> = {
   dictationTranslation: "settingsPage.aiModels.modes",
 };
 
-function startCloudOnboarding() {
-  localStorage.setItem("pendingCloudMigration", "true");
-  localStorage.setItem("onboardingCurrentStep", "0");
-  localStorage.removeItem("onboardingCompleted");
-  window.location.reload();
-}
-
 interface InferenceConfigEditorProps {
   scope: InferenceScope;
   onModeChange?: (mode: InferenceMode) => void;
@@ -41,19 +34,12 @@ interface InferenceConfigEditorProps {
 export default function InferenceConfigEditor({ scope, onModeChange }: InferenceConfigEditorProps) {
   const { t } = useTranslation();
   const config = useSettingsStore(useShallow((s) => selectResolvedLLMConfig(s, scope)));
-  const isSignedIn = useSettingsStore((s) => s.isSignedIn);
+  const localInferenceTimeoutMs = useSettingsStore((s) => s.localInferenceTimeoutMs);
+  const setLocalInferenceTimeoutMs = useSettingsStore((s) => s.setLocalInferenceTimeoutMs);
 
   const prefix = MODE_LABEL_PREFIX[scope];
   const { modes, isModeAllowed } = usePolicyModeOptions<InferenceModeOption>(
     [
-      {
-        id: "openwhispr",
-        label: t(`${prefix}.openwhispr`),
-        description: t(`${prefix}.openwhisprDesc`),
-        icon: <Cloud className="w-4 h-4" />,
-        disabled: !isSignedIn,
-        badge: !isSignedIn ? t("common.freeAccountRequired") : undefined,
-      },
       {
         id: "providers",
         label: t(`${prefix}.providers`),
@@ -93,15 +79,10 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
   const handleModeSelect = useCallback(
     (mode: InferenceMode) => {
       if (!isModeAllowed(mode)) return;
-      if (mode === "openwhispr" && !isSignedIn) {
-        startCloudOnboarding();
-        return;
-      }
       if (mode === config.mode) return;
 
       const patch: Parameters<typeof setResolvedLLMConfig>[1] = {
         mode,
-        cloudMode: mode === "openwhispr" ? "openwhispr" : "byok",
       };
       if (!isProviderValidForMode(config.provider, mode)) {
         patch.provider = "";
@@ -109,13 +90,13 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
       }
       setResolvedLLMConfig(scope, patch);
 
-      if (mode === "openwhispr" || mode === "self-hosted" || mode === "enterprise") {
+      if (mode === "self-hosted" || mode === "enterprise") {
         window.electronAPI?.llamaServerStop?.();
       }
 
       onModeChange?.(mode);
     },
-    [scope, config.mode, config.provider, isSignedIn, onModeChange, isModeAllowed]
+    [scope, config.mode, config.provider, onModeChange, isModeAllowed]
   );
 
   const setMode = setField("mode");
@@ -189,6 +170,70 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
           setLocalReasoningProvider={setProvider}
         />
       )}
+
+      {/* Advanced: request timeouts */}
+      <div className="border-t border-border/40 pt-3 mt-1">
+        <div className="flex items-center gap-2 mb-2">
+          <Settings2 size={13} className="text-muted-foreground/50" />
+          <h4 className="text-xs font-medium text-muted-foreground/80 uppercase tracking-wider">
+            {t("settingsPage.aiModels.advanced.title")}
+          </h4>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h5 className="text-xs font-medium text-foreground">
+              {t("settingsPage.aiModels.advanced.timeoutLabel")}
+            </h5>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {t("settingsPage.aiModels.advanced.timeoutHelp")}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <input
+              type="number"
+              min={5}
+              max={600}
+              value={Math.round((config.timeoutMs || 30000) / 1000)}
+              onChange={(e) => {
+                const seconds = Math.min(600, Math.max(5, Number(e.target.value) || 30));
+                setField("timeoutMs")(seconds * 1000);
+              }}
+              className="w-20 h-7 rounded-md border border-border/50 bg-transparent px-2 text-xs text-foreground outline-none focus:border-primary/40"
+            />
+            <span className="text-xs text-muted-foreground/50">
+              {t("settingsPage.aiModels.advanced.secondsSuffix")}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-border/20">
+          <div className="flex-1 min-w-0">
+            <h5 className="text-xs font-medium text-foreground">
+              {t("settingsPage.aiModels.advanced.localTimeoutLabel")}
+            </h5>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {t("settingsPage.aiModels.advanced.localTimeoutHelp")}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <input
+              type="number"
+              min={30}
+              max={3600}
+              value={Math.round((localInferenceTimeoutMs || 300000) / 1000)}
+              onChange={(e) => {
+                const seconds = Math.min(3600, Math.max(30, Number(e.target.value) || 300));
+                setLocalInferenceTimeoutMs(seconds * 1000);
+              }}
+              className="w-20 h-7 rounded-md border border-border/50 bg-transparent px-2 text-xs text-foreground outline-none focus:border-primary/40"
+            />
+            <span className="text-xs text-muted-foreground/50">
+              {t("settingsPage.aiModels.advanced.secondsSuffix")}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

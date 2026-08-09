@@ -552,7 +552,7 @@ class LlamaServerManager {
             "Content-Type": "application/json",
             "Content-Length": Buffer.byteLength(body),
           },
-          timeout: 300000,
+          timeout: options.timeoutMs ?? 300000,
         },
         (res) => {
           let data = "";

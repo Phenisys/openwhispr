@@ -187,7 +187,10 @@ export const openaiProvider: InferenceProvider = {
 
       for (const { url: endpoint, type } of endpointCandidates) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          config.timeoutMs ?? REQUEST_TIMEOUT_MS
+        );
         try {
           const maxTokens =
             config.maxTokens ||

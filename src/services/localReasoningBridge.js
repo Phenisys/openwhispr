@@ -39,6 +39,7 @@ class LocalReasoningService {
         repeatPenalty: config.repeatPenalty || 1.1,
         systemPrompt: config.systemPrompt || "",
         disableThinking: config.disableThinking !== false,
+        timeoutMs: config.timeoutMs,
       };
 
       debugLogger.logReasoning("LOCAL_BRIDGE_INFERENCE", {

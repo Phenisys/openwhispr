@@ -1684,6 +1684,14 @@
       "description": "Clean up transcriptions, handle commands, and fix errors while preserving your tone.",
       "enableTextCleanup": "Enable text cleanup",
       "enableTextCleanupDescription": "Use AI to remove filler words, fix grammar, and polish punctuation",
+      "advanced": {
+        "title": "Advanced",
+        "timeoutLabel": "Request timeout",
+        "timeoutHelp": "Seconds before an inference request is aborted.",
+        "localTimeoutLabel": "Local model timeout (llama.cpp)",
+        "localTimeoutHelp": "Seconds before a local inference request is aborted.",
+        "secondsSuffix": "s"
+      },
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
         "providers": "Cloud Providers",

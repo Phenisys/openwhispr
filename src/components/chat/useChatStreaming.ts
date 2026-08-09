@@ -252,6 +252,7 @@ export function useChatStreaming({
                   ? settings.chatAgentCustomApiKey || undefined
                   : undefined,
               disableThinking: settings.chatAgentDisableThinking,
+              timeoutMs: settings.chatAgentTimeoutMs,
             },
             aiTools
           );

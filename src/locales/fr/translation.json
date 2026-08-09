@@ -1684,6 +1684,14 @@
       "description": "Corrige les transcriptions, gère les commandes et corrige les erreurs tout en préservant votre ton.",
       "enableTextCleanup": "Activer la correction de texte",
       "enableTextCleanupDescription": "L'IA supprime les mots de remplissage, corrige la grammaire et la ponctuation",
+      "advanced": {
+        "title": "Avancé",
+        "timeoutLabel": "Délai de requête",
+        "timeoutHelp": "Secondes avant l'abandon d'une requête d'inférence.",
+        "localTimeoutLabel": "Délai modèle local (llama.cpp)",
+        "localTimeoutHelp": "Secondes avant l'abandon d'une requête d'inférence locale.",
+        "secondsSuffix": "s"
+      },
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
         "providers": "Fournisseurs cloud",

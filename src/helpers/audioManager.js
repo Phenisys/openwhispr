@@ -159,7 +159,10 @@ function resolveReasoningRoute(
       kind: "translation",
       model: settings.translationModel?.trim() || "",
       cleanupReachable,
-      cleanupConfig: { disableThinking: settings.cleanupDisableThinking },
+      cleanupConfig: {
+        disableThinking: settings.cleanupDisableThinking,
+        timeoutMs: settings.cleanupTimeoutMs,
+      },
       config: {
         provider,
         language: settings.translationTargetLanguage,
@@ -170,6 +173,7 @@ function resolveReasoningRoute(
             ? settings.translationCustomApiKey || undefined
             : undefined,
         disableThinking: settings.translationDisableThinking,
+        timeoutMs: settings.translationTimeoutMs,
         systemPrompt: resolvePrompt("translate", {
           agentName,
           targetLanguageLabel: getLanguageLabel(settings.translationTargetLanguage),
@@ -185,6 +189,7 @@ function resolveReasoningRoute(
       model: agent.model,
       config: {
         ...agent.config,
+        timeoutMs: settings.dictationAgentTimeoutMs,
         systemPrompt: resolvePrompt("dictationAgent", {
           agentName,
           language: settings.preferredLanguage,

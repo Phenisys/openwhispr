@@ -516,6 +516,7 @@ class ModelManager {
         max_tokens: options.maxTokens ?? 512,
         disableThinking: options.disableThinking,
         requireCompleteOutput: options.requireCompleteOutput,
+        timeoutMs: options.timeoutMs,
       });
 
       const totalTime = Date.now() - startTime;
