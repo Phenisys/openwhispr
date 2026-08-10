@@ -10,6 +10,8 @@ export interface InferenceScopeStoreKeys {
   customApiKey?: keyof SettingsState;
   disableThinking?: keyof SettingsState;
   timeoutMs?: keyof SettingsState;
+  maxTokens?: keyof SettingsState;
+  maxRetries?: keyof SettingsState;
 }
 
 export interface InferenceScopeDefinition {
@@ -29,6 +31,8 @@ export const INFERENCE_SCOPES = {
       customApiKey: "cleanupCustomApiKey",
       disableThinking: "cleanupDisableThinking",
       timeoutMs: "cleanupTimeoutMs",
+      maxTokens: "cleanupMaxTokens",
+      maxRetries: "cleanupMaxRetries",
     },
   },
   dictationAgent: {
@@ -42,6 +46,8 @@ export const INFERENCE_SCOPES = {
       customApiKey: "dictationAgentCustomApiKey",
       disableThinking: "dictationAgentDisableThinking",
       timeoutMs: "dictationAgentTimeoutMs",
+      maxTokens: "dictationAgentMaxTokens",
+      maxRetries: "dictationAgentMaxRetries",
     },
   },
   noteFormatting: {
@@ -55,6 +61,8 @@ export const INFERENCE_SCOPES = {
       customApiKey: "noteFormattingCustomApiKey",
       disableThinking: "noteFormattingDisableThinking",
       timeoutMs: "noteFormattingTimeoutMs",
+      maxTokens: "noteFormattingMaxTokens",
+      maxRetries: "noteFormattingMaxRetries",
     },
     fallbackScope: "dictationCleanup",
   },
@@ -69,6 +77,8 @@ export const INFERENCE_SCOPES = {
       customApiKey: "chatAgentCustomApiKey",
       disableThinking: "chatAgentDisableThinking",
       timeoutMs: "chatAgentTimeoutMs",
+      maxTokens: "chatAgentMaxTokens",
+      maxRetries: "chatAgentMaxRetries",
     },
   },
   dictationTranslation: {
@@ -82,6 +92,8 @@ export const INFERENCE_SCOPES = {
       customApiKey: "translationCustomApiKey",
       disableThinking: "translationDisableThinking",
       timeoutMs: "translationTimeoutMs",
+      maxTokens: "translationMaxTokens",
+      maxRetries: "translationMaxRetries",
     },
   },
 } as const satisfies Record<string, InferenceScopeDefinition>;

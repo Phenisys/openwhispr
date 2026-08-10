@@ -14,6 +14,8 @@ export async function generateNoteTitle(
       temperature: 0.3,
       disableThinking: getSettings().noteFormattingDisableThinking,
       timeoutMs: getSettings().noteFormattingTimeoutMs,
+      maxTokens: getSettings().noteFormattingMaxTokens,
+      maxRetries: getSettings().noteFormattingMaxRetries,
       ...config,
     });
     const cleaned = raw.trim().replace(/^["']|["']$/g, "");

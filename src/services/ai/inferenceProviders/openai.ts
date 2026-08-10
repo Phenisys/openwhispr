@@ -279,7 +279,7 @@ export const openaiProvider: InferenceProvider = {
       }
 
       throw lastError || new Error("No OpenAI endpoint responded");
-    }, createApiRetryStrategy());
+    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
 
     const isResponsesApi = Array.isArray(response?.output);
     const isChatCompletions = Array.isArray(response?.choices);

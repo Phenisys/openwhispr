@@ -253,6 +253,8 @@ export function useChatStreaming({
                   : undefined,
               disableThinking: settings.chatAgentDisableThinking,
               timeoutMs: settings.chatAgentTimeoutMs,
+              maxTokens: settings.chatAgentMaxTokens,
+              maxRetries: settings.chatAgentMaxRetries,
             },
             aiTools
           );

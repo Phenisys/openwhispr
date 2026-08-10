@@ -54,7 +54,7 @@ export const tinfoilProvider: InferenceProvider = {
           timeout: config.timeoutMs ?? REQUEST_TIMEOUT_MS,
           maxRetries: 0,
         }),
-      createApiRetryStrategy()
+      { ...createApiRetryStrategy(), maxRetries: config.maxRetries }
     );
 
     const responseText =

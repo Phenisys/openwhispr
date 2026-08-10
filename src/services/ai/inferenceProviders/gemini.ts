@@ -112,7 +112,7 @@ export const geminiProvider: InferenceProvider = {
       } finally {
         clearTimeout(timeoutId);
       }
-    }, createApiRetryStrategy());
+    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
 
     const candidate = response.candidates?.[0];
     if (config.requireCompleteOutput && candidate?.finishReason === "MAX_TOKENS") {

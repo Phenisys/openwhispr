@@ -1690,7 +1690,11 @@
         "timeoutHelp": "Seconds before an inference request is aborted.",
         "localTimeoutLabel": "Local model timeout (llama.cpp)",
         "localTimeoutHelp": "Seconds before a local inference request is aborted.",
-        "secondsSuffix": "s"
+        "secondsSuffix": "s",
+        "maxTokensLabel": "Max output tokens",
+        "maxTokensHelp": "Cap on generated tokens. 0 = automatic.",
+        "retryLabel": "Retry attempts",
+        "retryHelp": "Retries after a failed request. 0 = single attempt."
       },
       "modes": {
         "openwhispr": "OpenWhispr Cloud",

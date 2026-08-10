@@ -1690,7 +1690,11 @@
         "timeoutHelp": "Secondes avant l'abandon d'une requête d'inférence.",
         "localTimeoutLabel": "Délai modèle local (llama.cpp)",
         "localTimeoutHelp": "Secondes avant l'abandon d'une requête d'inférence locale.",
-        "secondsSuffix": "s"
+        "secondsSuffix": "s",
+        "maxTokensLabel": "Tokens de sortie max",
+        "maxTokensHelp": "Plafond des tokens générés. 0 = automatique.",
+        "retryLabel": "Nombre de tentatives",
+        "retryHelp": "Nouvelles tentatives après un échec. 0 = une seule tentative."
       },
       "modes": {
         "openwhispr": "OpenWhispr Cloud",

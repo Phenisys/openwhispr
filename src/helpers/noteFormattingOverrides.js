@@ -3,6 +3,8 @@
 // guesses the provider from the model and can silently hit a cloud API.
 export function buildNoteFormattingOverrides(noteFormatting, isCloudMode) {
   const timeoutMs = noteFormatting?.timeoutMs;
+  const maxTokens = noteFormatting?.maxTokens;
+  const maxRetries = noteFormatting?.maxRetries;
 
   let overrides;
   if (isCloudMode) {
@@ -46,6 +48,15 @@ export function buildNoteFormattingOverrides(noteFormatting, isCloudMode) {
   // for callers/tests that don't set it).
   if (timeoutMs) {
     overrides.timeoutMs = timeoutMs;
+  }
+  // Same for the token cap and retry count. maxTokens 0 means "auto", so it
+  // stays unset rather than short-circuit a provider's own calculation; a 0
+  // retry count is meaningful (single attempt) and must be forwarded.
+  if (maxTokens) {
+    overrides.maxTokens = maxTokens;
+  }
+  if (maxRetries !== undefined) {
+    overrides.maxRetries = maxRetries;
   }
   return overrides;
 }

@@ -529,6 +529,20 @@ export interface SettingsState
   translationTimeoutMs: number;
   localInferenceTimeoutMs: number;
 
+  /** Max output tokens per scope. 0 = auto (calculated floor). */
+  cleanupMaxTokens: number;
+  dictationAgentMaxTokens: number;
+  noteFormattingMaxTokens: number;
+  chatAgentMaxTokens: number;
+  translationMaxTokens: number;
+
+  /** Retry attempts per scope. 0 = single attempt. */
+  cleanupMaxRetries: number;
+  dictationAgentMaxRetries: number;
+  noteFormattingMaxRetries: number;
+  chatAgentMaxRetries: number;
+  translationMaxRetries: number;
+
   customPrompts: Record<PromptKind, string>;
   setCustomPrompt: (kind: PromptKind, value: string) => void;
 
@@ -1341,6 +1355,18 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   translationTimeoutMs: readNumber("translationTimeoutMs", 30000),
   localInferenceTimeoutMs: readNumber("localInferenceTimeoutMs", 300000),
 
+  cleanupMaxTokens: readNumber("cleanupMaxTokens", 0),
+  dictationAgentMaxTokens: readNumber("dictationAgentMaxTokens", 0),
+  noteFormattingMaxTokens: readNumber("noteFormattingMaxTokens", 0),
+  chatAgentMaxTokens: readNumber("chatAgentMaxTokens", 0),
+  translationMaxTokens: readNumber("translationMaxTokens", 0),
+
+  cleanupMaxRetries: readNumber("cleanupMaxRetries", 3),
+  dictationAgentMaxRetries: readNumber("dictationAgentMaxRetries", 3),
+  noteFormattingMaxRetries: readNumber("noteFormattingMaxRetries", 3),
+  chatAgentMaxRetries: readNumber("chatAgentMaxRetries", 3),
+  translationMaxRetries: readNumber("translationMaxRetries", 3),
+
   customPrompts: PROMPT_KIND_LIST.reduce(
     (acc, kind) => ({ ...acc, [kind]: readString(`customPrompt.${kind}`, "") }),
     {} as Record<PromptKind, string>
@@ -2083,6 +2109,8 @@ export interface ResolvedNoteFormatting {
   remoteUrl: string;
   customApiKey: string;
   timeoutMs: number;
+  maxTokens: number;
+  maxRetries: number;
 }
 
 export const selectResolvedNoteFormatting = (state: SettingsState): ResolvedNoteFormatting => {
@@ -2107,6 +2135,8 @@ export const selectResolvedNoteFormatting = (state: SettingsState): ResolvedNote
     remoteUrl: cfg.remoteUrl || "",
     customApiKey: cfg.customApiKey || (borrowsEndpoint ? cleanup.customApiKey || "" : ""),
     timeoutMs: cfg.timeoutMs,
+    maxTokens: cfg.maxTokens,
+    maxRetries: cfg.maxRetries,
   };
 };
 
@@ -2121,6 +2151,10 @@ export interface ResolvedLLMConfig {
   customApiKey?: string;
   disableThinking: boolean;
   timeoutMs: number;
+  /** Max output tokens; 0 = auto (calculated floor). */
+  maxTokens: number;
+  /** Retry attempts; 0 = single attempt. */
+  maxRetries: number;
 }
 
 export const selectResolvedLLMConfig = (
@@ -2147,6 +2181,18 @@ export const selectResolvedLLMConfig = (
     fallback?.timeoutMs ||
     30000;
 
+  const maxTokensKey = def.storeKeys.maxTokens;
+  const maxTokens =
+    (maxTokensKey ? (state[maxTokensKey] as number | undefined) : undefined) ||
+    fallback?.maxTokens ||
+    0;
+
+  const maxRetriesKey = def.storeKeys.maxRetries;
+  const maxRetries =
+    (maxRetriesKey ? (state[maxRetriesKey] as number | undefined) : undefined) ||
+    fallback?.maxRetries ||
+    3;
+
   return {
     scope,
     mode: state[def.storeKeys.mode] as InferenceMode,
@@ -2161,6 +2207,8 @@ export const selectResolvedLLMConfig = (
     customApiKey: read("customApiKey"),
     disableThinking,
     timeoutMs,
+    maxTokens,
+    maxRetries,
   };
 };
 

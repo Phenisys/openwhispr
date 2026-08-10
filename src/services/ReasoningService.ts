@@ -315,7 +315,7 @@ class ReasoningService extends BaseReasoningService {
       } finally {
         clearTimeout(timeoutId);
       }
-    }, createApiRetryStrategy());
+    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
 
     if (!response.choices || !response.choices[0]) {
       logger.logReasoning(`${providerName.toUpperCase()}_RESPONSE_ERROR`, {

@@ -162,6 +162,8 @@ function resolveReasoningRoute(
       cleanupConfig: {
         disableThinking: settings.cleanupDisableThinking,
         timeoutMs: settings.cleanupTimeoutMs,
+        maxTokens: settings.cleanupMaxTokens,
+        maxRetries: settings.cleanupMaxRetries,
       },
       config: {
         provider,
@@ -174,6 +176,8 @@ function resolveReasoningRoute(
             : undefined,
         disableThinking: settings.translationDisableThinking,
         timeoutMs: settings.translationTimeoutMs,
+        maxTokens: settings.translationMaxTokens,
+        maxRetries: settings.translationMaxRetries,
         systemPrompt: resolvePrompt("translate", {
           agentName,
           targetLanguageLabel: getLanguageLabel(settings.translationTargetLanguage),
@@ -190,6 +194,8 @@ function resolveReasoningRoute(
       config: {
         ...agent.config,
         timeoutMs: settings.dictationAgentTimeoutMs,
+        maxTokens: settings.dictationAgentMaxTokens,
+        maxRetries: settings.dictationAgentMaxRetries,
         systemPrompt: resolvePrompt("dictationAgent", {
           agentName,
           language: settings.preferredLanguage,
@@ -202,7 +208,12 @@ function resolveReasoningRoute(
   if (kind === "cleanup") {
     return {
       kind: "cleanup",
-      config: { disableThinking: settings.cleanupDisableThinking },
+      config: {
+        disableThinking: settings.cleanupDisableThinking,
+        timeoutMs: settings.cleanupTimeoutMs,
+        maxTokens: settings.cleanupMaxTokens,
+        maxRetries: settings.cleanupMaxRetries,
+      },
     };
   }
   return { kind: "skip" };

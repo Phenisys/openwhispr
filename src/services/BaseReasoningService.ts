@@ -18,6 +18,8 @@ export interface ReasoningConfig {
   requiresAgent?: boolean;
   /** Request timeout in ms. Falls back to the scope default (30 s). */
   timeoutMs?: number;
+  /** Retry attempts after a failed request. 0 = single attempt. Falls back to the global default (3). */
+  maxRetries?: number;
 }
 
 export abstract class BaseReasoningService {

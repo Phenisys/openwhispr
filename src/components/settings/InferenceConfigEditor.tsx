@@ -233,6 +233,50 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
             </span>
           </div>
         </div>
+
+        <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-border/20">
+          <div className="flex-1 min-w-0">
+            <h5 className="text-xs font-medium text-foreground">
+              {t("settingsPage.aiModels.advanced.maxTokensLabel")}
+            </h5>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {t("settingsPage.aiModels.advanced.maxTokensHelp")}
+            </p>
+          </div>
+          <input
+            type="number"
+            min={0}
+            max={32768}
+            value={config.maxTokens || 0}
+            onChange={(e) => {
+              const tokens = Math.min(32768, Math.max(0, Number(e.target.value) || 0));
+              setField("maxTokens")(tokens);
+            }}
+            className="w-24 h-7 rounded-md border border-border/50 bg-transparent px-2 text-xs text-foreground outline-none focus:border-primary/40"
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-border/20">
+          <div className="flex-1 min-w-0">
+            <h5 className="text-xs font-medium text-foreground">
+              {t("settingsPage.aiModels.advanced.retryLabel")}
+            </h5>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {t("settingsPage.aiModels.advanced.retryHelp")}
+            </p>
+          </div>
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={config.maxRetries ?? 3}
+            onChange={(e) => {
+              const retries = Math.min(10, Math.max(0, Number(e.target.value) || 0));
+              setField("maxRetries")(retries);
+            }}
+            className="w-20 h-7 rounded-md border border-border/50 bg-transparent px-2 text-xs text-foreground outline-none focus:border-primary/40"
+          />
+        </div>
       </div>
     </div>
   );
