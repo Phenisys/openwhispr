@@ -795,10 +795,12 @@ export default function PersonalNotesView({
                       if (segments.length > 0) {
                         isMeetingNote = true;
                         formattedTranscript = segments
-                          .map(
-                            (s) =>
-                              `${s.source === "mic" ? t("notes.speaker.you") : t("notes.speaker.them")}: ${s.text}`
-                          )
+                          .map((s) => {
+                            const label =
+                              s.speakerName ||
+                              (s.source === "mic" ? "You" : "Them");
+                            return `${label}: ${s.text}`;
+                          })
                           .join("\n");
                       }
                       if (!formattedTranscript) {

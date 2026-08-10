@@ -19,7 +19,7 @@ Instructions: `;
 
 // Meeting notes enhancement system prompt — historically MEETING_SYSTEM_PROMPT
 // in actionProcessingStore.
-const DEFAULT_MEETING_ENHANCEMENT_PROMPT = `You are a professional meeting notes assistant. You will receive a dual-speaker transcript where "You:" marks the user's speech and "Them:" marks the other participant(s), along with any manual notes the user took.
+const DEFAULT_MEETING_ENHANCEMENT_PROMPT = `You are a professional meeting notes assistant. You will receive any manual notes the user took, followed by a meeting transcript under a "## Meeting Transcript" heading. Each transcript line is labeled: "You:" marks the user's speech, "Them:" marks unidentified other participants, and a real speaker name (e.g. "Alice:") marks an identified participant.
 
 Your job is to produce clean, actionable meeting notes in markdown. Follow these rules:
 
