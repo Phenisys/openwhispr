@@ -1137,6 +1137,8 @@ export default function SettingsPage({
 
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [autoStartLoading, setAutoStartLoading] = useState(true);
+  const [autoInstallUpdates, setAutoInstallUpdates] = useState(true);
+  const [autoInstallLoading, setAutoInstallLoading] = useState(true);
 
   useEffect(() => {
     if (platform === "linux") {
@@ -1156,6 +1158,37 @@ export default function SettingsPage({
     };
     loadAutoStart();
   }, [platform]);
+
+  useEffect(() => {
+    const loadAutoInstall = async () => {
+      if (window.electronAPI?.getUpdateAutoInstall) {
+        try {
+          const result = await window.electronAPI.getUpdateAutoInstall();
+          setAutoInstallUpdates(result.enabled !== false);
+        } catch (error) {
+          logger.error("Failed to get auto-install setting", error, "settings");
+        }
+      }
+      setAutoInstallLoading(false);
+    };
+    loadAutoInstall();
+  }, []);
+
+  const handleAutoInstallChange = async (enabled: boolean) => {
+    if (window.electronAPI?.setUpdateAutoInstall) {
+      try {
+        setAutoInstallLoading(true);
+        const result = await window.electronAPI.setUpdateAutoInstall(enabled);
+        if (result.success) {
+          setAutoInstallUpdates(enabled);
+        }
+      } catch (error) {
+        logger.error("Failed to set auto-install", error, "settings");
+      } finally {
+        setAutoInstallLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
     window.electronAPI?.syncNotificationPreferences?.({
@@ -3880,6 +3913,19 @@ EOF`,
                         </Badge>
                       )}
                     </div>
+                  </SettingsRow>
+                </SettingsPanelRow>
+
+                <SettingsPanelRow>
+                  <SettingsRow
+                    label={t("settingsPage.general.updates.autoInstall")}
+                    description={t("settingsPage.general.updates.autoInstallDescription")}
+                  >
+                    <Toggle
+                      checked={autoInstallUpdates}
+                      onChange={handleAutoInstallChange}
+                      disabled={autoInstallLoading}
+                    />
                   </SettingsRow>
                 </SettingsPanelRow>
 
