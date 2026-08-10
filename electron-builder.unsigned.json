@@ -1,0 +1,11 @@
+{
+  "extends": "electron-builder.json",
+  "mac": {
+    "identity": "-",
+    "notarize": false,
+    "hardenedRuntime": false
+  },
+  "win": {
+    "azureSignOptions": null
+  }
+}
