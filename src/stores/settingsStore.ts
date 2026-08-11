@@ -2183,14 +2183,14 @@ export const selectResolvedLLMConfig = (
 
   const maxTokensKey = def.storeKeys.maxTokens;
   const maxTokens =
-    (maxTokensKey ? (state[maxTokensKey] as number | undefined) : undefined) ||
-    fallback?.maxTokens ||
+    (maxTokensKey ? (state[maxTokensKey] as number | undefined) : undefined) ??
+    fallback?.maxTokens ??
     0;
 
   const maxRetriesKey = def.storeKeys.maxRetries;
   const maxRetries =
-    (maxRetriesKey ? (state[maxRetriesKey] as number | undefined) : undefined) ||
-    fallback?.maxRetries ||
+    (maxRetriesKey ? (state[maxRetriesKey] as number | undefined) : undefined) ??
+    fallback?.maxRetries ??
     3;
 
   return {
