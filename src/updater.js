@@ -1,4 +1,24 @@
 const { autoUpdater } = require("electron-updater");
+const fs = require("fs");
+const path = require("path");
+
+// The update feed is configurable per build: a packed update-feed.json
+// (declared in electron-builder.json extraResources) overrides the upstream
+// default. Internal builds (see release-interne.yml) ship
+// {"owner":"Phenisys","repo":"openwhispr"} so they only ever see internal
+// releases — and never upstream ones.
+function resolveUpdateFeed() {
+  try {
+    const feedPath = path.join(process.resourcesPath, "update-feed.json");
+    const feed = JSON.parse(fs.readFileSync(feedPath, "utf8"));
+    if (feed.owner && feed.repo) {
+      return { provider: "github", private: false, ...feed };
+    }
+  } catch {
+    // Missing or unreadable feed file -> upstream defaults
+  }
+  return { provider: "github", owner: "OpenWhispr", repo: "openwhispr", private: false };
+}
 
 class UpdateManager {
   constructor() {
@@ -26,12 +46,7 @@ class UpdateManager {
       return;
     }
 
-    autoUpdater.setFeedURL({
-      provider: "github",
-      owner: "OpenWhispr",
-      repo: "openwhispr",
-      private: false,
-    });
+    autoUpdater.setFeedURL(resolveUpdateFeed());
 
     // Use arch-specific update channel on macOS to prevent arm64/x64
     // from downloading mismatched artifacts. Both builds publish to the

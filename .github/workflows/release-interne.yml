@@ -124,6 +124,10 @@ jobs:
           # supportsNativeCapture reflects compile-time PipeWire linkage, so this passes on CI runners with no PipeWire daemon (where "ok" is false).
           resources/bin/linux-system-audio-helper probe | grep '"supportsNativeCapture":true'
 
+      - name: Point updater feed at the Phenisys repo
+        shell: bash
+        run: echo '{"owner":"Phenisys","repo":"openwhispr","private":false}' > resources/update-feed.json
+
       - name: Build Application
         # -c.publish.* override electron-builder.json (qui cible OpenWhispr/openwhispr)
         # pour publier sur Phenisys/openwhispr.
@@ -227,6 +231,10 @@ jobs:
         run: |
           echo "GOOGLE_CALENDAR_CLIENT_ID=${{ secrets.GOOGLE_CALENDAR_CLIENT_ID }}" >> .env
           echo "GOOGLE_CALENDAR_CLIENT_SECRET=${{ secrets.GOOGLE_CALENDAR_CLIENT_SECRET }}" >> .env
+
+      - name: Point updater feed at the Phenisys repo
+        shell: bash
+        run: echo '{"owner":"Phenisys","repo":"openwhispr","private":false}' > resources/update-feed.json
 
       - name: Build and Publish Application
         shell: bash
@@ -352,6 +360,10 @@ jobs:
         run: |
           echo "GOOGLE_CALENDAR_CLIENT_ID=${{ secrets.GOOGLE_CALENDAR_CLIENT_ID }}" >> .env
           echo "GOOGLE_CALENDAR_CLIENT_SECRET=${{ secrets.GOOGLE_CALENDAR_CLIENT_SECRET }}" >> .env
+
+      - name: Point updater feed at the Phenisys repo
+        shell: bash
+        run: echo '{"owner":"Phenisys","repo":"openwhispr","private":false}' > resources/update-feed.json
 
       - name: Build Application (${{ matrix.arch }})
         run: |

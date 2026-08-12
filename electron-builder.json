@@ -180,6 +180,10 @@
       {
         "from": "resources/bin/nircmd.exe",
         "to": "bin/nircmd.exe"
+      },
+      {
+        "from": "resources/update-feed.json",
+        "to": "update-feed.json"
       }
     ]
   },
