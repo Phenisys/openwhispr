@@ -18,7 +18,7 @@ export default function ChatAgentSettings() {
           description={t("agentMode.settings.systemPromptDescription")}
         />
         <textarea
-          value={chatAgentPrompt}
+          value={chatAgentPrompt ?? ""}
           onChange={(e) => setCustomPrompt("chatAgent", e.target.value)}
           placeholder={t("agentMode.settings.systemPromptPlaceholder")}
           rows={4}

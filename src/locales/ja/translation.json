@@ -1082,7 +1082,7 @@
     },
     "view": {
       "customPrompt": "カスタムプロンプト",
-      "defaultPrompt": "デフォルトプロンプト",
+      "defaultPrompt": "デフォルトプロンプト","emptyPrompt": "プロンプトなし",
       "modified": "変更済み"
     },
     "defaultTestInputTranslate": "今日はいい天気ですね、散歩に行きませんか？"

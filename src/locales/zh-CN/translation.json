@@ -1082,7 +1082,7 @@
     },
     "view": {
       "customPrompt": "自定义提示词",
-      "defaultPrompt": "默认提示词",
+      "defaultPrompt": "默认提示词","emptyPrompt": "无提示词",
       "modified": "已修改"
     },
     "defaultTestInputTranslate": "今天天气真好，要不要出去走走？"

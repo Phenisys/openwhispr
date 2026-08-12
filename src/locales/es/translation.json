@@ -1130,7 +1130,7 @@
     },
     "view": {
       "customPrompt": "Prompt personalizado",
-      "defaultPrompt": "Prompt predeterminado",
+      "defaultPrompt": "Prompt predeterminado","emptyPrompt": "Sin prompt",
       "modified": "Modificado"
     },
     "defaultTestInputTranslate": "Hace un día precioso hoy, ¿te apetece dar un paseo?"

@@ -30,11 +30,12 @@ export const geminiProvider: InferenceProvider = {
     const apiKey = await ctx.getApiKey("gemini");
     logger.logReasoning("GEMINI_API_KEY", { hasApiKey: !!apiKey, keyLength: apiKey?.length || 0 });
 
-    const systemPrompt = config.systemPrompt || ctx.getSystemPrompt(agentName);
-    const userContent = config.systemPrompt ? text : wrapCleanupTranscript(text);
+    const isCleanup = config.systemPrompt == null;
+    const systemPrompt = config.systemPrompt ?? ctx.getSystemPrompt(agentName);
+    const userContent = isCleanup ? wrapCleanupTranscript(text) : text;
 
     const generationConfig: GeminiGenerationConfig = {
-      temperature: config.temperature ?? (config.systemPrompt ? 0.3 : 0),
+      temperature: config.temperature ?? (isCleanup ? 0 : 0.3),
       maxOutputTokens:
         config.maxTokens ||
         Math.max(
@@ -53,7 +54,13 @@ export const geminiProvider: InferenceProvider = {
     }
 
     const requestBody = {
-      contents: [{ parts: [{ text: `${systemPrompt}\n\n${userContent}` }] }],
+      contents: [
+        {
+          parts: systemPrompt
+            ? [{ text: `${systemPrompt}\n\n${userContent}` }]
+            : [{ text: userContent }],
+        },
+      ],
       generationConfig,
     };
 

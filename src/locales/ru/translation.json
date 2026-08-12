@@ -1082,7 +1082,7 @@
     },
     "view": {
       "customPrompt": "Пользовательский промпт",
-      "defaultPrompt": "Промпт по умолчанию",
+      "defaultPrompt": "Промпт по умолчанию","emptyPrompt": "Без промпта",
       "modified": "Изменён"
     },
     "defaultTestInputTranslate": "Сегодня прекрасная погода, хочешь прогуляться?"

@@ -83,3 +83,53 @@ test("fixed system prompts are wired to their consumer sites", () => {
     "audioManager must pass the customizable selection-edit suffix"
   );
 });
+
+test("an explicitly empty custom prompt means NO system prompt, not the default", () => {
+  const root = path.join(__dirname, "../../src");
+
+  const prompts = fs.readFileSync(path.join(root, "config/prompts/index.ts"), "utf8");
+  assert.ok(
+    prompts.includes("const template = custom ?? getDefaultPromptText"),
+    "resolvePrompt must only fall back to the default for null (not configured), not for an explicit \"\""
+  );
+  assert.ok(
+    prompts.includes('if (template === "") return "";'),
+    "resolvePrompt must surface an explicit empty prompt unchanged"
+  );
+
+  const store = fs.readFileSync(path.join(root, "stores/settingsStore.ts"), "utf8");
+  assert.ok(
+    store.includes('const CUSTOM_PROMPT_EMPTY_SENTINEL = "__EMPTY__"'),
+    "store persists an explicit empty prompt with a sentinel"
+  );
+  assert.ok(
+    store.includes('if (raw === null || raw === "") return null;'),
+    "legacy empty/absent values map back to null (default prompt)"
+  );
+  assert.ok(
+    store.includes('if (value === null) localStorage.removeItem(`customPrompt.${kind}`)'),
+    "resetting a prompt removes the stored value"
+  );
+
+  const studio = fs.readFileSync(path.join(root, "components/ui/PromptStudio.tsx"), "utf8");
+  assert.ok(
+    studio.includes("useState(customPrompt ?? defaultPrompt)"),
+    "PromptStudio must show an empty textarea for an explicit empty prompt"
+  );
+  assert.ok(
+    studio.includes("setCustomPrompt(kind, null);"),
+    "PromptStudio reset must restore the default prompt (null), not store an empty one"
+  );
+
+  const agentPrompt = fs.readFileSync(path.join(root, "config/prompts.ts"), "utf8");
+  assert.ok(
+    agentPrompt.includes("if (customToolPrompt != null) {"),
+    "getAgentSystemPrompt must treat an explicit empty toolInstructions as 'no tool guidance'"
+  );
+
+  const audioManager = fs.readFileSync(path.join(root, "helpers/audioManager.js"), "utf8");
+  assert.ok(
+    audioManager.includes("getSettings().customPrompts.cleanup ?? undefined"),
+    "getCustomPrompt must preserve an explicit empty cleanup prompt"
+  );
+});

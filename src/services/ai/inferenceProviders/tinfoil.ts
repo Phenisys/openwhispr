@@ -18,12 +18,15 @@ export const tinfoilProvider: InferenceProvider = {
     // refuses to send anything over an unverified transport.
     const client = await getTinfoilChatClient(apiKey);
 
-    const systemPrompt = config.systemPrompt || ctx.getSystemPrompt(agentName);
-    const userContent = config.systemPrompt ? text : wrapCleanupTranscript(text);
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userContent },
-    ];
+    const isCleanup = config.systemPrompt == null;
+    const systemPrompt = config.systemPrompt ?? ctx.getSystemPrompt(agentName);
+    const userContent = isCleanup ? wrapCleanupTranscript(text) : text;
+    const messages = systemPrompt
+      ? [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ]
+      : [{ role: "user", content: userContent }];
 
     const maxTokens =
       config.maxTokens ||
@@ -41,7 +44,7 @@ export const tinfoilProvider: InferenceProvider = {
       model,
       messages,
       max_tokens: maxTokens,
-      temperature: config.temperature ?? (config.systemPrompt ? 0.3 : 0),
+      temperature: config.temperature ?? (isCleanup ? 0 : 0.3),
     };
 
     applyThinkingSuppression(requestBody, model, "tinfoil", config);

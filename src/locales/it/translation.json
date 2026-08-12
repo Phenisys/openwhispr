@@ -1082,7 +1082,7 @@
     },
     "view": {
       "customPrompt": "Prompt personalizzato",
-      "defaultPrompt": "Prompt predefinito",
+      "defaultPrompt": "Prompt predefinito","emptyPrompt": "Nessun prompt",
       "modified": "Modificato"
     },
     "defaultTestInputTranslate": "Che bella giornata oggi, ti va di fare due passi?"

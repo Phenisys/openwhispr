@@ -24,8 +24,9 @@ export const enterpriseProvider: InferenceProvider = {
 
     logger.logReasoning("ENTERPRISE_START", { provider: enterpriseId, model, agentName });
 
-    const systemPrompt = config.systemPrompt || ctx.getSystemPrompt(agentName);
-    const userContent = config.systemPrompt ? text : wrapCleanupTranscript(text);
+    const isCleanup = config.systemPrompt == null;
+    const systemPrompt = config.systemPrompt ?? ctx.getSystemPrompt(agentName);
+    const userContent = isCleanup ? wrapCleanupTranscript(text) : text;
     const { supportsTemperature } = getOpenAiApiConfig(model);
 
     const startTime = Date.now();
@@ -35,7 +36,8 @@ export const enterpriseProvider: InferenceProvider = {
       agentName,
       {
         ...config,
-        systemPrompt,
+        // undefined omits the key from the JSON body -> no system message sent.
+        systemPrompt: systemPrompt || undefined,
         provider: enterpriseId,
         supportsTemperature,
         ...getEnterpriseCallSettings(enterpriseId),

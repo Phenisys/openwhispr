@@ -107,7 +107,7 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
   const customPrompt = useSettingsStore((s) => s.customPrompts[kind]);
   const setCustomPrompt = useSettingsStore((s) => s.setCustomPrompt);
   const defaultPrompt = getDefaultPromptText(kind, uiLanguage);
-  const [editedPrompt, setEditedPrompt] = useState(customPrompt || defaultPrompt);
+  const [editedPrompt, setEditedPrompt] = useState(customPrompt ?? defaultPrompt);
 
   const savePrompt = () => {
     setCustomPrompt(kind, editedPrompt);
@@ -119,7 +119,8 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
 
   const resetToDefault = () => {
     setEditedPrompt(defaultPrompt);
-    setCustomPrompt(kind, "");
+    // null = not configured -> the default prompt is used again.
+    setCustomPrompt(kind, null);
     showAlertDialog({
       title: t("promptStudio.dialogs.reset.title"),
       description: t("promptStudio.dialogs.reset.description"),
@@ -307,8 +308,9 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
   };
 
   const isAgentAddressed = testText.toLowerCase().includes(agentName.toLowerCase());
-  const isCustomPrompt = customPrompt.length > 0;
-  const currentPrompt = customPrompt || defaultPrompt;
+  const isNoPrompt = customPrompt === "";
+  const isCustomPrompt = (customPrompt?.length ?? 0) > 0;
+  const currentPrompt = customPrompt ?? defaultPrompt;
 
   const tabs = [
     { id: "current" as const, label: t("promptStudio.tabs.view"), icon: Eye },
@@ -356,9 +358,11 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
-                    {isCustomPrompt
-                      ? t("promptStudio.view.customPrompt")
-                      : t("promptStudio.view.defaultPrompt")}
+                    {isNoPrompt
+                      ? t("promptStudio.view.emptyPrompt")
+                      : isCustomPrompt
+                        ? t("promptStudio.view.customPrompt")
+                        : t("promptStudio.view.defaultPrompt")}
                   </p>
                   {isCustomPrompt && (
                     <span className="text-xs font-semibold uppercase tracking-wider px-1.5 py-px rounded-full bg-primary/10 text-primary">

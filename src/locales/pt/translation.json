@@ -1061,7 +1061,7 @@
     },
     "view": {
       "customPrompt": "Prompt personalizado",
-      "defaultPrompt": "Prompt padrão",
+      "defaultPrompt": "Prompt padrão","emptyPrompt": "Sem prompt",
       "modified": "Modificado"
     },
     "defaultTestInputTranslate": "O tempo está lindo hoje, quer dar um passeio?"

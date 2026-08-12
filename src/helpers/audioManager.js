@@ -2550,7 +2550,9 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
   }
 
   getCustomPrompt() {
-    return getSettings().customPrompts.cleanup || undefined;
+    // ?? preserves an explicit "" (no prompt) while mapping null (not
+    // configured) to undefined so the caller applies the default.
+    return getSettings().customPrompts.cleanup ?? undefined;
   }
 
   getKeyterms() {

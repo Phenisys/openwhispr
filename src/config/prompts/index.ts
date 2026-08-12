@@ -16,7 +16,10 @@ export interface ResolvePromptOptions {
 
 export function resolvePrompt(kind: PromptKind, opts: ResolvePromptOptions): string {
   const custom = useSettingsStore.getState().customPrompts[kind];
-  const template = custom || getDefaultPromptText(kind, opts.uiLanguage);
+  // null = not configured -> default prompt; "" = explicitly empty -> the
+  // caller must send NO system prompt to the model.
+  const template = custom ?? getDefaultPromptText(kind, opts.uiLanguage);
+  if (template === "") return "";
   return applySubstitutions(template, opts);
 }
 

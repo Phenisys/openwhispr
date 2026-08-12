@@ -144,12 +144,15 @@ export const openaiProvider: InferenceProvider = {
       keyLength: apiKey?.length || 0,
     });
 
-    const systemPrompt = config.systemPrompt || ctx.getSystemPrompt(agentName);
-    const userContent = config.systemPrompt ? text : wrapCleanupTranscript(text);
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userContent },
-    ];
+    const isCleanup = config.systemPrompt == null;
+    const systemPrompt = config.systemPrompt ?? ctx.getSystemPrompt(agentName);
+    const userContent = isCleanup ? wrapCleanupTranscript(text) : text;
+    const messages = systemPrompt
+      ? [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ]
+      : [{ role: "user", content: userContent }];
 
     const openAiBase = isOpenRouter
       ? API_ENDPOINTS.OPENROUTER_BASE
@@ -215,14 +218,14 @@ export const openaiProvider: InferenceProvider = {
           } else {
             requestBody.messages = messages;
             requestBody[apiConfig.tokenParam] = maxTokens;
-            if (!config.systemPrompt && model.includes("gpt-oss")) {
+            if (isCleanup && model.includes("gpt-oss")) {
               requestBody.reasoning_effort = "low";
             }
             applyThinkingSuppression(requestBody, model, resolvedProvider, config, openAiBase);
           }
 
           if (apiConfig.supportsTemperature) {
-            requestBody.temperature = config.temperature ?? (config.systemPrompt ? 0.3 : 0);
+            requestBody.temperature = config.temperature ?? (isCleanup ? 0 : 0.3);
           }
 
           const res = await fetch(endpoint, {

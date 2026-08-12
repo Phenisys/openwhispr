@@ -1170,7 +1170,7 @@
     },
     "view": {
       "customPrompt": "Prompt personnalisé",
-      "defaultPrompt": "Prompt par défaut",
+      "defaultPrompt": "Prompt par défaut","emptyPrompt": "Aucun prompt",
       "modified": "Modifié"
     },
     "defaultTestInputTranslate": "Il fait très beau aujourd'hui, ça te dit d'aller te promener ?"

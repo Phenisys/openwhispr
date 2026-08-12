@@ -202,15 +202,18 @@ class ReasoningService extends BaseReasoningService {
     providerName: string
   ): Promise<string> {
     // No systemPrompt override means the default cleanup path: a deterministic
-    // transform, so zero temperature and a delimited transcript.
-    const isCleanup = !config.systemPrompt;
-    const systemPrompt = config.systemPrompt || this.getSystemPrompt(agentName);
+    // transform, so zero temperature and a delimited transcript. An explicit
+    // empty prompt ("") sends NO system message and keeps the default temperature.
+    const isCleanup = config.systemPrompt == null;
+    const systemPrompt = config.systemPrompt ?? this.getSystemPrompt(agentName);
     const userPrompt = isCleanup ? wrapCleanupTranscript(text) : text;
 
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ];
+    const messages = systemPrompt
+      ? [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ]
+      : [{ role: "user", content: userPrompt }];
 
     const requestBody: any = {
       model,

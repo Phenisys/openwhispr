@@ -48,9 +48,13 @@ export function getAgentSystemPrompt(availableTools?: string[], noteContext?: st
 
   if (availableTools && availableTools.length > 0) {
     // A custom toolInstructions prompt replaces the per-tool map entirely.
+    // null = not configured (per-tool defaults); "" = explicitly empty (no
+    // tool guidance block at all).
     const customToolPrompt = useSettingsStore.getState().customPrompts.toolInstructions;
-    if (customToolPrompt?.trim()) {
-      prompt += "\n\n" + customToolPrompt.trim();
+    if (customToolPrompt != null) {
+      if (customToolPrompt.trim()) {
+        prompt += "\n\n" + customToolPrompt.trim();
+      }
     } else {
       const toolLines = availableTools.map((name) => TOOL_INSTRUCTIONS[name]).filter(Boolean);
       if (toolLines.length > 0) {

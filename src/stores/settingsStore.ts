@@ -48,6 +48,18 @@ function readString(key: string, fallback: string): string {
   return localStorage.getItem(key) ?? fallback;
 }
 
+// Custom prompts have three states: null (not configured -> default prompt),
+// "" (explicitly empty -> NO system prompt sent to the model), or a custom
+// text. localStorage cannot store null, and legacy values persisted "" for
+// "not configured", so an explicit empty prompt is persisted as the
+// "__EMPTY__" sentinel. Legacy ""/absent values map back to null.
+const CUSTOM_PROMPT_EMPTY_SENTINEL = "__EMPTY__";
+function parseCustomPrompt(raw: string | null): string | null {
+  if (raw === null || raw === "") return null;
+  if (raw === CUSTOM_PROMPT_EMPTY_SENTINEL) return "";
+  return raw;
+}
+
 function readBoolean(key: string, fallback: boolean): boolean {
   if (!isBrowser) return fallback;
   const stored = localStorage.getItem(key);
@@ -543,8 +555,8 @@ export interface SettingsState
   chatAgentMaxRetries: number;
   translationMaxRetries: number;
 
-  customPrompts: Record<PromptKind, string>;
-  setCustomPrompt: (kind: PromptKind, value: string) => void;
+  customPrompts: Record<PromptKind, string | null>;
+  setCustomPrompt: (kind: PromptKind, value: string | null) => void;
 
   setDictationAgentMode: (mode: InferenceMode) => void;
   setDictationAgentProvider: (value: string) => void;
@@ -1368,11 +1380,18 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   translationMaxRetries: readNumber("translationMaxRetries", 3),
 
   customPrompts: PROMPT_KIND_LIST.reduce(
-    (acc, kind) => ({ ...acc, [kind]: readString(`customPrompt.${kind}`, "") }),
-    {} as Record<PromptKind, string>
+    (acc, kind) => ({ ...acc, [kind]: parseCustomPrompt(readString(`customPrompt.${kind}`, "")) }),
+    {} as Record<PromptKind, string | null>
   ),
   setCustomPrompt: (kind, value) => {
-    if (isBrowser) localStorage.setItem(`customPrompt.${kind}`, value);
+    if (isBrowser) {
+      if (value === null) localStorage.removeItem(`customPrompt.${kind}`);
+      else
+        localStorage.setItem(
+          `customPrompt.${kind}`,
+          value === "" ? CUSTOM_PROMPT_EMPTY_SENTINEL : value
+        );
+    }
     useSettingsStore.setState((s) => ({
       customPrompts: { ...s.customPrompts, [kind]: value },
     }));
@@ -2668,18 +2687,22 @@ export async function initializeSettings(): Promise<void> {
 
   // Sync Zustand store when another window writes to localStorage
   window.addEventListener("storage", (event) => {
-    if (!event.key || event.storageArea !== localStorage || event.newValue === null) return;
+    if (!event.key || event.storageArea !== localStorage) return;
 
-    const { key, newValue } = event;
-
-    if (key.startsWith("customPrompt.")) {
-      const kind = key.slice("customPrompt.".length) as PromptKind;
+    // Custom prompt keys are handled first: a removeItem (reset to default)
+    // arrives with newValue === null and must still sync across windows.
+    if (event.key.startsWith("customPrompt.")) {
+      const kind = event.key.slice("customPrompt.".length) as PromptKind;
       if (!PROMPT_KIND_LIST.includes(kind)) return;
       useSettingsStore.setState((s) => ({
-        customPrompts: { ...s.customPrompts, [kind]: newValue },
+        customPrompts: { ...s.customPrompts, [kind]: parseCustomPrompt(event.newValue) },
       }));
       return;
     }
+
+    if (event.newValue === null) return;
+
+    const { key, newValue } = event;
 
     const state = useSettingsStore.getState();
     if (!(key in state) || typeof (state as unknown as Record<string, unknown>)[key] === "function")

@@ -1170,7 +1170,7 @@
     },
     "view": {
       "customPrompt": "Benutzerdefinierter Prompt",
-      "defaultPrompt": "Standard-Prompt",
+      "defaultPrompt": "Standard-Prompt","emptyPrompt": "Kein Prompt",
       "modified": "Geändert"
     },
     "defaultTestInputTranslate": "Das Wetter ist heute wunderschön, hast du Lust auf einen Spaziergang?"

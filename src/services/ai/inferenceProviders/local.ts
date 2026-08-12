@@ -14,11 +14,13 @@ export const localProvider: InferenceProvider = {
 
     logger.logReasoning("LOCAL_IPC_CALL", { model, textLength: text.length });
 
-    const systemPrompt = config.systemPrompt || ctx.getSystemPrompt(agentName);
-    const userContent = config.systemPrompt ? text : wrapCleanupTranscript(text);
+    const isCleanup = config.systemPrompt == null;
+    const systemPrompt = config.systemPrompt ?? ctx.getSystemPrompt(agentName);
+    const userContent = isCleanup ? wrapCleanupTranscript(text) : text;
     const result = await window.electronAPI.processLocalReasoning(userContent, model, agentName, {
       ...config,
-      systemPrompt,
+      // undefined omits the key from the JSON body -> no system message sent.
+      systemPrompt: systemPrompt || undefined,
     });
 
     const processingTimeMs = Date.now() - startTime;
