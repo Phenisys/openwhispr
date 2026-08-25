@@ -1501,7 +1501,7 @@
     },
     "general": {
       "appearance": {
-        "auto": "自動",
+        "auto": "システム",
         "dark": "ダーク",
         "description": "OpenWhispr の外観を設定",
         "light": "ライト",

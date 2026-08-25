@@ -1501,7 +1501,7 @@
     },
     "general": {
       "appearance": {
-        "auto": "自動",
+        "auto": "系统",
         "dark": "深色",
         "description": "控制 OpenWhispr 的外觀",
         "light": "淺色",

@@ -1507,7 +1507,7 @@
     },
     "general": {
       "appearance": {
-        "auto": "Авто",
+        "auto": "Система",
         "dark": "Тёмная",
         "description": "Управляйте внешним видом OpenWhispr",
         "light": "Светлая",
