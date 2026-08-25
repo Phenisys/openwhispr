@@ -1,0 +1,59 @@
+name: Feature Request
+description: Demande de fonctionnalité pour la chaîne de développement autonome — doit être COMPLÈTE pour être traitée
+title: "[Feat] "
+labels: ["feature-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Toute issue incomplète sera renvoyée en clarification (label `blocked-needs-info`).
+        Le Product Manager vérifie la complétude avant toute prise en charge : contexte, comportement attendu, critères d'acceptation testables, périmètre, références.
+  - type: textarea
+    id: contexte
+    attributes:
+      label: Contexte
+      description: Pourquoi cette fonctionnalité ? Quel problème résout-elle ?
+      placeholder: "Ex. : les utilisateurs ne peuvent pas X, ce qui entraîne Y."
+    validations:
+      required: true
+  - type: textarea
+    id: comportement
+    attributes:
+      label: Comportement attendu
+      description: Que doit faire le système exactement, sans ambiguïté ?
+      placeholder: "Ex. : lors d'un clic sur X, l'application doit afficher Y."
+    validations:
+      required: true
+  - type: textarea
+    id: criteres
+    attributes:
+      label: Critères d'acceptation
+      description: Liste testable de ce qui doit être vérifié. Au moins 2-3 critères actionnables.
+      placeholder: |
+        - [ ] Le bouton X déclenche Y
+        - [ ] Z fonctionne hors-ligne
+        - [ ] Les tests existants passent
+    validations:
+      required: true
+  - type: input
+    id: perimetre
+    attributes:
+      label: Périmètre (si identifié)
+      description: Fichiers, modules ou composants concernés
+      placeholder: "Ex. : src/components/SettingsPage.tsx"
+  - type: textarea
+    id: references
+    attributes:
+      label: Références
+      description: Issues liées, docs, liens, captures d'écran
+      placeholder: "Ex. : #123, lien vers doc, capture…"
+  - type: dropdown
+    id: priorite
+    attributes:
+      label: Priorité
+      options:
+        - Faible
+        - Normale
+        - Haute
+    validations:
+      required: true
