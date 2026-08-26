@@ -4,6 +4,7 @@ import { getSettings, selectResolvedNoteFormatting } from "./settingsStore";
 import { appendDictionarySuffix, resolvePrompt } from "../config/prompts";
 import { generateNoteTitle } from "../utils/generateTitle";
 import { buildNoteFormattingOverrides } from "../helpers/noteFormattingOverrides";
+import { tagActionItemOwners, type MentionPerson } from "../utils/mentionMarkdown";
 import type { ActionItem } from "../types/electron";
 
 export type ActionProcessingStatus = "idle" | "processing" | "success";
@@ -60,6 +61,8 @@ export interface RunActionOptions {
   isMeetingNote?: boolean;
   /** Opt-in so enhancement never renames a note the user has titled. */
   allowTitleGeneration?: boolean;
+  /** People whose names in generated action-item owners become mention tags. */
+  knownPeople?: MentionPerson[];
 }
 
 export interface RunActionLabels {
@@ -130,7 +133,9 @@ export function runBackgroundAction(
       if (cancelledFlags.get(noteId)) return;
 
       const updates: Record<string, string> = {
-        enhanced_content: enhanced,
+        enhanced_content: options.knownPeople?.length
+          ? tagActionItemOwners(enhanced, options.knownPeople)
+          : enhanced,
         enhancement_prompt: action.prompt,
         enhanced_at_content_hash: contentHash,
       };

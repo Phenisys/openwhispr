@@ -59,6 +59,14 @@ import type { NoteItem } from "../../types/electron";
 import logger from "../../utils/logger";
 import { parseTranscriptSegments } from "../../utils/parseTranscriptSegments";
 import { resolveExpectedSpeakerCount } from "../../utils/participants";
+import {
+  buildLlmTranscript,
+  buildMeetingContext,
+  collectKnownPeople,
+  type MeetingIdentity,
+} from "../../utils/llmTranscript";
+import type { MentionPerson } from "../../utils/mentionMarkdown";
+import type { CalendarAttendee } from "../../types/calendar";
 import { serializeTranscriptSegments } from "../../utils/transcriptSpeakerState";
 import { cn } from "../lib/utils";
 import { useToast } from "../ui/useToast";
@@ -73,6 +81,16 @@ import { ContainerOverview } from "./overview/ContainerOverview";
 
 function makeContentHash(content: string): string {
 	return String(content.length) + "-" + content.slice(0, 50);
+}
+
+function parseNoteParticipants(raw: string | null | undefined): CalendarAttendee[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function draftFromNote(note: NoteItem): NoteEditorDraft {
@@ -871,7 +889,9 @@ export default function PersonalNotesView({
 										if (!hasNotes && !rawTranscript) return;
 
 										let formattedTranscript = "";
+										let meetingContext = "";
 										let isMeetingNote = false;
+										let knownPeople: MentionPerson[] = [];
 										if (rawTranscript) {
 											// The live store's flat `transcript` string has no speaker
 											// info — use the structured live segments instead when available.
@@ -890,15 +910,23 @@ export default function PersonalNotesView({
 												const speakerMappings: Record<string, string> = {};
 												for (const m of mappings || [])
 													speakerMappings[m.speaker_id] = m.display_name;
-												formattedTranscript = segments
-													.map((s) => {
-														const label =
-															(s.speaker && speakerMappings[s.speaker]) ||
-															s.speakerName ||
-															(s.source === "mic" ? "You" : "Them");
-														return `${label}: ${s.text}`;
-													})
-													.join("\n");
+
+												// Phenisys fork: no account/Cloud layer, so the note owner
+												// has no server-side identity — the mic track stays "You".
+												const identity: MeetingIdentity = {
+													selfName: null,
+													selfEmail: null,
+													participants: parseNoteParticipants(editorNote.participants),
+												};
+												const selfLabel = t("notes.speaker.you");
+												meetingContext = buildMeetingContext(identity, selfLabel);
+												formattedTranscript = buildLlmTranscript(
+													segments,
+													speakerMappings,
+													selfLabel,
+													t
+												);
+												knownPeople = collectKnownPeople(identity, speakerMappings, segments);
 											}
 											if (!formattedTranscript) {
 												formattedTranscript = rawTranscript;
@@ -907,6 +935,7 @@ export default function PersonalNotesView({
 
 										const parts = [
 											hasNotes ? noteContent : "",
+											meetingContext,
 											formattedTranscript
 												? `## Meeting Transcript\n${formattedTranscript}`
 												: "",
@@ -930,6 +959,7 @@ export default function PersonalNotesView({
 													],
 													calendarEventName,
 												),
+												knownPeople,
 											},
 										);
 									}}
