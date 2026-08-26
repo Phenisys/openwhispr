@@ -25,6 +25,7 @@ const { i18nMain, changeLanguage } = require("./i18nMain");
 const DeepgramStreaming = require("./deepgramStreaming");
 const CortiStreaming = require("./cortiStreaming");
 const OpenAIRealtimeStreaming = require("./openaiRealtimeStreaming");
+const { fetchRealtimeTokenForProvider } = require("./realtimeTokenProviders");
 const { getCortiToken } = require("./cortiAuth");
 const { createTinfoilRealtimeSocket } = require("./tinfoilSecureClient");
 const { getTinfoilChatModels } = require("./tinfoilCatalog");
@@ -5557,84 +5558,19 @@ class IPCHandlers {
         return response.json();
       };
 
-      const dual = (factory) => (streams === 2 ? Promise.all([factory(), factory()]) : factory());
-
-      if (options.provider === "assemblyai-realtime") {
-        if (options.mode === "byok") {
-          const apiKey = this.environmentManager.getAssemblyAIKey();
-          if (!apiKey) {
-            throw new Error("No AssemblyAI API key configured. Add your key in Settings.");
-          }
-          return dual(async () => {
-            const response = await proxyFetch(
-              "https://streaming.assemblyai.com/v3/token?expires_in_seconds=60",
-              { headers: { Authorization: apiKey } }
-            );
-            if (!response.ok) {
-              const err = await response.json().catch(() => ({}));
-              throw new Error(err.error || `AssemblyAI token request failed: ${response.status}`);
-            }
-            const data = await response.json();
-            if (!data.token) throw new Error("No AssemblyAI token received");
-            return data.token;
-          });
-        }
-        return dual(async () => {
-          const data = await postServerToken("/api/streaming-token");
-          if (!data.token) throw new Error("No AssemblyAI token received");
-          return data.token;
-        });
-      }
-
-      if (options.provider === "deepgram-realtime") {
-        if (options.mode === "byok") {
-          const apiKey = this.environmentManager.getDeepgramKey();
-          if (!apiKey) {
-            throw new Error("No Deepgram API key configured. Add your key in Settings.");
-          }
-          return streams === 2 ? [apiKey, apiKey] : apiKey;
-        }
-        return dual(async () => {
-          const data = await postServerToken("/api/deepgram-streaming-token");
-          if (!data.token) throw new Error("No Deepgram token received");
-          return data.token;
-        });
-      }
-
-      if (options.provider === "corti-realtime") {
-        // One token covers both meeting streams; it's only used at the WSS handshake.
-        const { token } = await this._mintStoredCortiToken(options);
-        return streams === 2 ? [token, token] : token;
-      }
-      if (options.provider === "tinfoil-realtime") {
-        const apiKey = this.environmentManager.getTinfoilKey();
-        if (!apiKey) {
-          const err = new Error("No Tinfoil API key configured. Add your key in Settings.");
-          err.code = "NO_API";
-          throw err;
-        }
-        return streams === 2 ? [apiKey, apiKey] : apiKey;
-      }
-
-      if (options.mode === "byok") {
-        const apiKey = this.environmentManager.getOpenAIKey();
-        if (!apiKey) throw new Error("No OpenAI API key configured. Add your key in Settings.");
-        return streams === 2 ? [apiKey, apiKey] : apiKey;
-      }
-
-      const data = await postServerToken("/api/openai-realtime-token", {
-        model: options.model,
-        language: options.language,
-        streams: streams || 1,
-      });
-      if (streams === 2) {
-        if (!data.clientSecrets || data.clientSecrets.length < 2) {
-          throw new Error("Expected two client secrets for dual-stream");
-        }
-        return data.clientSecrets;
-      }
-      if (!data.clientSecret) throw new Error("No client secret received");
-      return data.clientSecret;
+      // Fail-closed allowlist (#1624): an unknown provider must not silently fall
+      // through to the OpenAI branch. Phenisys fork: BYOK-only token acquisition.
+      return fetchRealtimeTokenForProvider(
+        options.provider,
+        {
+          environmentManager: this.environmentManager,
+          proxyFetch,
+          postServerToken,
+          mintCortiToken: (tokenOptions) => this._mintStoredCortiToken(tokenOptions),
+        },
+        options,
+        { streams }
+      );
     };
 
     const getMeetingSystemAudioCapabilityMode = () => {
@@ -6551,6 +6487,14 @@ class IPCHandlers {
     };
 
     const connectDictationStreaming = async (event, options) => {
+      // Older renderers did not label the OpenAI dictation adapter. Dictation
+      // realtime was OpenAI-only before Tinfoil support, so preserve that
+      // established default while requiring new adapters to be explicit (#1624).
+      options = {
+        ...options,
+        provider: options?.provider || "openai-realtime",
+      };
+
       if (this._dictationConnectPromise) {
         await this._dictationConnectPromise.catch(() => {});
       }
@@ -6565,6 +6509,10 @@ class IPCHandlers {
 
       const connectInner = async () => {
         const isCloud = options.mode !== "byok";
+        // Dictation renderers before 1.8.4 omit `provider` and mean OpenAI; the
+        // default lives here, at the boundary, so the token allowlist stays
+        // fail-closed for genuinely unknown providers (#1624).
+        const provider = options.provider ?? "openai-realtime";
         const streaming = new OpenAIRealtimeStreaming();
         setupDictationCallbacks(streaming, event);
         // Assign before the token fetch (a real network round trip) so
@@ -6575,9 +6523,9 @@ class IPCHandlers {
         try {
           const apiKey = await fetchRealtimeToken(event, {
             mode: options.mode,
-            provider: options.provider,
+            provider,
           });
-          if (options.provider === "tinfoil-realtime") {
+          if (provider === "tinfoil-realtime") {
             const model = options.model || TINFOIL_REALTIME_MODEL;
             await streaming.connect({
               apiKey,

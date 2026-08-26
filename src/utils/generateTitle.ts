@@ -2,6 +2,7 @@ import reasoningService from "../services/ReasoningService";
 import type { ReasoningConfig } from "../services/BaseReasoningService";
 import { getSettings } from "../stores/settingsStore";
 import { resolvePrompt } from "../config/prompts";
+import { sanitizeGeneratedTitle } from "./sanitizeGeneratedTitle";
 
 export async function generateNoteTitle(
   text: string,
@@ -18,8 +19,7 @@ export async function generateNoteTitle(
       maxRetries: getSettings().noteFormattingMaxRetries,
       ...config,
     });
-    const cleaned = raw.trim().replace(/^["']|["']$/g, "");
-    return cleaned.length > 0 && cleaned.length < 100 ? cleaned : "";
+    return sanitizeGeneratedTitle(raw);
   } catch {
     return "";
   }
