@@ -25,7 +25,7 @@ on:
           - unsigned
 
 jobs:
-  tests:
+  tests-push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
