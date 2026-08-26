@@ -39,8 +39,46 @@ class AudioActivityDetector extends EventEmitter {
       this.consecutiveChecks = 0;
       this.audioActiveStart = null;
       this._clearSustainedTimer();
+    } else {
+      this._reevaluateAfterGate();
     }
     debugLogger.debug("User recording state changed", { active }, "meeting");
+  }
+
+  // External-mic state for the meeting auto-end controller (#1494). "External"
+  // means a process other than OpenWhispr's own tree holds the microphone; the
+  // event-driven listeners already track per-pid/session counts, and polling
+  // mode reports the last known activity. `reliable` is true only when the
+  // event-driven path is live — a polling snapshot cannot prove ownership.
+  getExternalMicState() {
+    const externalMicActive =
+      !this._userRecording &&
+      (this._activeMicPids.size > 0 || this._activeSources > 0 || this._lastSustainedActivity);
+    return {
+      reliable: this._eventDriven,
+      externalMicActive,
+    };
+  }
+
+  // Re-evaluates sustained activity after the user recording gate closes, so a
+  // meeting that started during dictation still arms detection once dictation ends.
+  _reevaluateAfterGate() {
+    if (!this._running || this._userRecording) return;
+    if (this.lastDismissedAt && Date.now() - this.lastDismissedAt < COOLDOWN_MS) return;
+    const now = Date.now();
+    if (this.audioActiveStart && !this.hasPrompted && !this._sustainedTimer) {
+      this._sustainedTimer = setTimeout(() => {
+        this._sustainedTimer = null;
+        if (this._userRecording || this.hasPrompted) return;
+        this.hasPrompted = true;
+        debugLogger.info(
+          "Sustained audio activity detected (post-gate)",
+          {},
+          "meeting"
+        );
+        this.emit("sustained-audio-detected", {});
+      }, SUSTAINED_EVENT_DRIVEN_MS);
+    }
   }
 
   async start() {
@@ -107,6 +145,7 @@ class AudioActivityDetector extends EventEmitter {
     this.consecutiveChecks = 0;
     this.audioActiveStart = null;
     this.hasPrompted = false;
+    this._lastSustainedActivity = false;
     this._activeMicPids.clear();
     this._activeSources = 0;
     this._clearResetTimer();
@@ -357,6 +396,12 @@ class AudioActivityDetector extends EventEmitter {
       "meeting"
     );
 
+    // Auto-end consumes the same raw signal: an external app started or stopped
+    // using the mic. Emitted before the gating logic so the controller can react
+    // to releases even when a meeting prompt was already shown.
+    const state = this.getExternalMicState();
+    this.emit("external-mic-state-changed", state);
+
     if (active) {
       this._clearResetTimer();
       if (this.hasPrompted) {
@@ -372,6 +417,7 @@ class AudioActivityDetector extends EventEmitter {
           if (this.lastDismissedAt && Date.now() - this.lastDismissedAt < COOLDOWN_MS) return;
 
           this.hasPrompted = true;
+          this._lastSustainedActivity = true;
           const now = Date.now();
           const durationMs = now - this.audioActiveStart;
           debugLogger.info(
@@ -419,6 +465,7 @@ class AudioActivityDetector extends EventEmitter {
 
         if (!this.hasPrompted && this.consecutiveChecks >= SUSTAINED_THRESHOLD_CHECKS) {
           this.hasPrompted = true;
+          this._lastSustainedActivity = true;
           const now = Date.now();
           const durationMs = now - this.audioActiveStart;
           debugLogger.info(

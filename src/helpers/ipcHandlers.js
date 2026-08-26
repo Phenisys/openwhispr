@@ -31,6 +31,7 @@ const { createTinfoilRealtimeSocket } = require("./tinfoilSecureClient");
 const { getTinfoilChatModels } = require("./tinfoilCatalog");
 const { transcribeWithTinfoil } = require("./tinfoilTranscription");
 const AudioStorageManager = require("./audioStorage");
+const { registerMeetingAutoEndKeepHandler } = require("./meetingAutoEndKeep");
 
 // Tinfoil's only realtime STT model — fallback when the renderer omits one.
 const TINFOIL_REALTIME_MODEL = "voxtral-mini-4b-realtime";
@@ -9047,6 +9048,8 @@ class IPCHandlers {
         return { success: false, error: error.message };
       }
     });
+
+    registerMeetingAutoEndKeepHandler(ipcMain, () => this.meetingDetectionEngine);
 
     ipcMain.handle("meeting-detection-set-preferences", async (_event, prefs) => {
       try {

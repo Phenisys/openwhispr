@@ -1273,6 +1273,30 @@ class WindowManager {
     this.notificationWindow = null;
   }
 
+  // Auto-end countdown reuses the meeting notification overlay with a
+  // kind:"auto-end" payload; the renderer drives the 60s countdown and the
+  // Keep button calls meeting-auto-end-keep.
+  async showMeetingAutoEndCountdown(countdown) {
+    const data = {
+      kind: "auto-end",
+      sessionId: countdown.sessionId,
+      reason: countdown.reason,
+      expiresAt: countdown.expiresAt,
+    };
+    await this.showMeetingNotification(data);
+    // The countdown overlay must stay until the user acts or it expires — the
+    // generic 30s notification timeout would close it mid-countdown.
+    if (this._notificationTimeout) {
+      clearTimeout(this._notificationTimeout);
+      this._notificationTimeout = null;
+    }
+    return true;
+  }
+
+  dismissMeetingAutoEndCountdown(sessionId) {
+    this.dismissMeetingNotification();
+  }
+
   async showUpdateNotification(info) {
     if (this._updateNotificationDismissed) return;
     if (this.updateNotificationWindow && !this.updateNotificationWindow.isDestroyed()) {
