@@ -1791,7 +1791,7 @@
     },
     "general": {
       "appearance": {
-        "auto": "Système",
+        "auto": "Auto",
         "dark": "Sombre",
         "description": "Contrôlez l'apparence d'OpenWhispr",
         "light": "Clair",

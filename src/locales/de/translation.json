@@ -1779,7 +1779,7 @@
     },
     "general": {
       "appearance": {
-        "auto": "System",
+        "auto": "Auto",
         "dark": "Dunkel",
         "description": "Steuern Sie das Erscheinungsbild von OpenWhispr",
         "light": "Hell",
