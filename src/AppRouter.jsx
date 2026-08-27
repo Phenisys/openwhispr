@@ -5,7 +5,6 @@ import MeetingNotificationOverlay from "./components/MeetingNotificationOverlay.
 import TranscriptionPreviewOverlay from "./components/TranscriptionPreviewOverlay.tsx";
 import UpdateNotificationOverlay from "./components/UpdateNotificationOverlay.tsx";
 import { useTheme } from "./hooks/useTheme";
-import { usePolicyStore } from "./stores/policyStore";
 import { isControlPanelWindow } from "./utils/windowContext.ts";
 
 const ControlPanel = React.lazy(() => import("./components/ControlPanel.tsx"));
