@@ -1082,7 +1082,8 @@
     },
     "view": {
       "customPrompt": "カスタムプロンプト",
-      "defaultPrompt": "デフォルトプロンプト","emptyPrompt": "プロンプトなし",
+      "defaultPrompt": "デフォルトプロンプト",
+      "emptyPrompt": "プロンプトなし",
       "modified": "変更済み"
     },
     "defaultTestInputTranslate": "今日はいい天気ですね、散歩に行きませんか？"
@@ -1446,6 +1447,18 @@
           "title": "エンタープライズ",
           "description": "組織のクラウドアカウントを使用しています。"
         }
+      },
+      "advanced": {
+        "title": "詳細設定",
+        "timeoutLabel": "リクエストタイムアウト",
+        "timeoutHelp": "推論リクエストが中断されるまでの秒数。",
+        "localTimeoutLabel": "ローカルモデルのタイムアウト（llama.cpp）",
+        "localTimeoutHelp": "ローカル推論リクエストが中断されるまでの秒数。",
+        "secondsSuffix": "秒",
+        "maxTokensLabel": "最大出力トークン数",
+        "maxTokensHelp": "生成トークンの上限。0 = 自動。",
+        "retryLabel": "再試行回数",
+        "retryHelp": "失敗したリクエスト後の再試行回数。0 = 1回のみ。"
       }
     },
     "developer": {
@@ -1771,7 +1784,17 @@
     },
     "prompts": {
       "description": "テキスト補正と指示検出を行う統合システムプロンプトの表示、カスタマイズ、テスト",
-      "title": "プロンプトスタジオ"
+      "title": "プロンプトスタジオ",
+      "enhancementTitle": "ノート拡張プロンプト",
+      "enhancementDescription": "生のノートを再構成・仕上げるためのシステムプロンプト。",
+      "meetingTitle": "会議ノートプロンプト",
+      "meetingDescription": "2話者の会議文字起こしをクリーンなアクションノートに変換するためのシステムプロンプト。",
+      "titleGenerationTitle": "タイトル生成プロンプト",
+      "titleGenerationDescription": "ノートタイトル自動生成時に使用されるシステムプロンプト。",
+      "selectionEditTitle": "選択範囲編集プロンプト",
+      "selectionEditDescription": "音声でテキスト選択を編集する際に適用されるシステムサフィックス。",
+      "toolInstructionsTitle": "エージェントツール指示",
+      "toolInstructionsDescription": "チャットエージェントが呼び出せるツールを説明する指示。空のままにすると既定値が維持されます。"
     },
     "speechToText": {
       "title": "音声認識",
@@ -2139,6 +2162,8 @@
         "anthropic_claude_haiku_4_5": "高速でフロンティアに近い知能",
         "gemini_gemini_3_5_flash": "最新の高速で高性能な Gemini モデル",
         "gemini_gemini_3_1_pro_preview": "複雑な推論向けの次世代フラッグシップモデル",
+        "gemini_gemini_3_5_flash_lite": "最速で最もコスト効率の高い3.5モデル",
+        "gemini_gemini_3_1_flash_lite": "低コストでフロンティア級のパフォーマンス",
         "gemini_gemini_3_flash_preview": "超高速・高性能の次世代モデル",
         "gemini_gemini_2_5_flash_lite": "最低レイテンシーとコスト",
         "gemini_gemma_4_31b_it": "Google 最大の Gemma 4、31B デンス、256K コンテキスト",

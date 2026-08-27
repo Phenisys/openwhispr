@@ -1082,7 +1082,8 @@
     },
     "view": {
       "customPrompt": "自定义提示词",
-      "defaultPrompt": "默认提示词","emptyPrompt": "无提示词",
+      "defaultPrompt": "默认提示词",
+      "emptyPrompt": "无提示词",
       "modified": "已修改"
     },
     "defaultTestInputTranslate": "今天天气真好，要不要出去走走？"
@@ -1446,6 +1447,18 @@
           "title": "企业级",
           "description": "正在使用你组织的云账号。"
         }
+      },
+      "advanced": {
+        "title": "高级",
+        "timeoutLabel": "请求超时",
+        "timeoutHelp": "推理请求中止前的秒数。",
+        "localTimeoutLabel": "本地模型超时（llama.cpp）",
+        "localTimeoutHelp": "本地推理请求中止前的秒数。",
+        "secondsSuffix": "秒",
+        "maxTokensLabel": "最大输出令牌数",
+        "maxTokensHelp": "生成令牌上限。0 = 自动。",
+        "retryLabel": "重试次数",
+        "retryHelp": "请求失败后的重试次数。0 = 仅一次。"
       }
     },
     "developer": {
@@ -1771,7 +1784,17 @@
     },
     "prompts": {
       "description": "查看、自定义和测试用于文本整理和指令识别的统一系统提示词",
-      "title": "提示词工作室"
+      "title": "提示词工作室",
+      "enhancementTitle": "笔记增强提示词",
+      "enhancementDescription": "用于重构和润色原始笔记的系统提示词。",
+      "meetingTitle": "会议笔记提示词",
+      "meetingDescription": "用于将双人会议转录转换为清晰行动笔记的系统提示词。",
+      "titleGenerationTitle": "标题生成提示词",
+      "titleGenerationDescription": "自动生成笔记标题时使用的系统提示词。",
+      "selectionEditTitle": "选区编辑提示词",
+      "selectionEditDescription": "通过语音编辑文本选区时应用的系统后缀。",
+      "toolInstructionsTitle": "智能体工具说明",
+      "toolInstructionsDescription": "描述聊天智能体可调用工具的使用说明。留空以保留每工具默认值。"
     },
     "speechToText": {
       "title": "语音转文字",
@@ -2139,6 +2162,8 @@
         "anthropic_claude_haiku_4_5": "快速且接近前沿水平",
         "gemini_gemini_3_5_flash": "最新、快速且高能力的 Gemini 模型",
         "gemini_gemini_3_1_pro_preview": "新一代旗舰模型，擅长复杂推理",
+        "gemini_gemini_3_5_flash_lite": "最快速、最具成本效益的 3.5 模型",
+        "gemini_gemini_3_1_flash_lite": "低成本的前沿性能",
         "gemini_gemini_3_flash_preview": "超快速、高能力的新一代模型",
         "gemini_gemini_2_5_flash_lite": "最低延迟和成本",
         "gemini_gemma_4_31b_it": "Google 最大的 Gemma 4，31B 稠密，256K 上下文",

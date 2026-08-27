@@ -1170,7 +1170,8 @@
     },
     "view": {
       "customPrompt": "Prompt personnalisé",
-      "defaultPrompt": "Prompt par défaut","emptyPrompt": "Aucun prompt",
+      "defaultPrompt": "Prompt par défaut",
+      "emptyPrompt": "Aucun prompt",
       "modified": "Modifié"
     },
     "defaultTestInputTranslate": "Il fait très beau aujourd'hui, ça te dit d'aller te promener ?"
@@ -1686,15 +1687,15 @@
       "enableTextCleanupDescription": "L'IA supprime les mots de remplissage, corrige la grammaire et la ponctuation",
       "advanced": {
         "title": "Avancé",
-        "timeoutLabel": "Délai de requête",
-        "timeoutHelp": "Secondes avant l'abandon d'une requête d'inférence.",
-        "localTimeoutLabel": "Délai modèle local (llama.cpp)",
-        "localTimeoutHelp": "Secondes avant l'abandon d'une requête d'inférence locale.",
+        "timeoutLabel": "Délai d'attente de la requête",
+        "timeoutHelp": "Secondes avant l'annulation d'une requête d'inférence.",
+        "localTimeoutLabel": "Délai d'attente du modèle local (llama.cpp)",
+        "localTimeoutHelp": "Secondes avant l'annulation d'une requête d'inférence locale.",
         "secondsSuffix": "s",
-        "maxTokensLabel": "Tokens de sortie max",
-        "maxTokensHelp": "Plafond des tokens générés. 0 = automatique.",
-        "retryLabel": "Nombre de tentatives",
-        "retryHelp": "Nouvelles tentatives après un échec. 0 = une seule tentative."
+        "maxTokensLabel": "Max. de jetons de sortie",
+        "maxTokensHelp": "Plafond des jetons générés. 0 = automatique.",
+        "retryLabel": "Tentatives de relance",
+        "retryHelp": "Relances après une requête échouée. 0 = tentative unique."
       },
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
@@ -2064,14 +2065,14 @@
       "title": "Studio de prompts",
       "enhancementTitle": "Prompt d'amélioration des notes",
       "enhancementDescription": "Prompt système pour restructurer et polir les notes brutes.",
-      "meetingTitle": "Prompt des notes de réunion",
-      "meetingDescription": "Prompt système pour transformer un échange à deux voix en notes de réunion propres et actionnables.",
+      "meetingTitle": "Prompt de notes de réunion",
+      "meetingDescription": "Prompt système pour transformer les transcriptions de réunions à deux interlocuteurs en notes d'action propres.",
       "titleGenerationTitle": "Prompt de génération de titre",
-      "titleGenerationDescription": "Prompt système utilisé pour générer automatiquement les titres de notes.",
+      "titleGenerationDescription": "Prompt système utilisé lors de la génération automatique des titres de notes.",
       "selectionEditTitle": "Prompt d'édition de sélection",
-      "selectionEditDescription": "Suffixe système appliqué lors de l'édition d'une sélection de texte à la voix.",
+      "selectionEditDescription": "Suffixe système appliqué lors de l'édition vocale d'une sélection de texte.",
       "toolInstructionsTitle": "Instructions d'outils de l'agent",
-      "toolInstructionsDescription": "Instructions décrivant les outils que l'agent de chat peut appeler. Laissez vide pour conserver les réglages par outil."
+      "toolInstructionsDescription": "Instructions décrivant les outils que l'agent de chat peut appeler. Laissez vide pour conserver les valeurs par défaut."
     },
     "speechToText": {
       "title": "Reconnaissance vocale",
@@ -2253,6 +2254,8 @@
         "anthropic_claude_haiku_4_5": "Rapide avec une intelligence de pointe",
         "gemini_gemini_3_5_flash": "Dernier modèle Gemini rapide et très performant",
         "gemini_gemini_3_1_pro_preview": "Modèle phare nouvelle génération pour le raisonnement complexe",
+        "gemini_gemini_3_5_flash_lite": "Modèle 3.5 le plus rapide et le plus économique",
+        "gemini_gemini_3_1_flash_lite": "Performance de pointe à faible coût",
         "gemini_gemini_3_flash_preview": "Modèle nouvelle génération ultra-rapide et très performant",
         "gemini_gemini_2_5_flash_lite": "Latence et coût les plus faibles",
         "gemini_gemma_4_31b_it": "Le plus grand Gemma 4 de Google, 31B dense, contexte 256K",

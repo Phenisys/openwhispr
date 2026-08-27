@@ -362,6 +362,7 @@ export default function TranscriptionModelPicker({
   const effectiveLocal = mode === "local" ? true : mode === "cloud" ? false : useLocalWhisper;
   const [localModels, setLocalModels] = useState<LocalModel[]>([]);
   const [parakeetModels, setParakeetModels] = useState<LocalModel[]>([]);
+  const [browsedCloudProvider, setBrowsedCloudProvider] = useState<string | null>(null);
   const [internalLocalProvider, setInternalLocalProvider] = useState(selectedLocalProvider);
   const hasLoadedRef = useRef(false);
   const hasLoadedParakeetRef = useRef(false);
@@ -644,27 +645,31 @@ export default function TranscriptionModelPicker({
   const handleCloudProviderChange = useCallback(
     (providerId: string) => {
       if (!providerAllowed(providerId)) return;
-      onCloudProviderSelect(providerId);
-      const provider = cloudProviders.find((p) => p.id === providerId);
+      // Browsing a provider tab must not switch the active model — the model is
+      // selected deliberately (upstream 1.9.0 fix). Remember the browsed tab and
+      // commit provider+model only when the user picks a model under it.
+      setBrowsedCloudProvider(providerId);
+    },
+    [providerAllowed]
+  );
 
-      if (providerId === "custom") {
-        onCloudModelSelect("whisper-1");
-        return;
+  const handleCloudModelSelect = useCallback(
+    (modelId: string) => {
+      if (browsedCloudProvider && browsedCloudProvider !== selectedCloudProvider) {
+        onCloudProviderSelect(browsedCloudProvider);
+        const provider = cloudProviders.find((p) => p.id === browsedCloudProvider);
+        if (provider) setCloudTranscriptionBaseUrl?.(provider.baseUrl);
       }
-
-      if (provider) {
-        setCloudTranscriptionBaseUrl?.(provider.baseUrl);
-        if (provider.models?.length) {
-          onCloudModelSelect(provider.models[0].id);
-        }
-      }
+      onCloudModelSelect(modelId);
+      setBrowsedCloudProvider(null);
     },
     [
-      cloudProviders,
+      browsedCloudProvider,
+      selectedCloudProvider,
       onCloudProviderSelect,
       onCloudModelSelect,
+      cloudProviders,
       setCloudTranscriptionBaseUrl,
-      providerAllowed,
     ]
   );
 
@@ -1000,7 +1005,7 @@ export default function TranscriptionModelPicker({
                   </label>
                   <Input
                     value={selectedCloudModel}
-                    onChange={(e) => onCloudModelSelect(e.target.value)}
+                    onChange={(e) => handleCloudModelSelect(e.target.value)}
                     placeholder="whisper-1"
                     className="h-8 text-sm"
                   />

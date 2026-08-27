@@ -1082,7 +1082,8 @@
     },
     "view": {
       "customPrompt": "自訂提示詞",
-      "defaultPrompt": "預設提示詞","emptyPrompt": "無提示詞",
+      "defaultPrompt": "預設提示詞",
+      "emptyPrompt": "無提示詞",
       "modified": "已修改"
     },
     "defaultTestInputTranslate": "今天天氣真好，要不要出去走走？"
@@ -1446,6 +1447,18 @@
           "title": "企業級",
           "description": "正在使用你組織的雲端帳號。"
         }
+      },
+      "advanced": {
+        "title": "進階",
+        "timeoutLabel": "請求逾時",
+        "timeoutHelp": "推論請求中止前的秒數。",
+        "localTimeoutLabel": "本機模型逾時（llama.cpp）",
+        "localTimeoutHelp": "本機推論請求中止前的秒數。",
+        "secondsSuffix": "秒",
+        "maxTokensLabel": "最大輸出 token 數",
+        "maxTokensHelp": "生成 token 上限。0 = 自動。",
+        "retryLabel": "重試次數",
+        "retryHelp": "請求失敗後的重試次數。0 = 僅一次。"
       }
     },
     "developer": {
@@ -1771,7 +1784,17 @@
     },
     "prompts": {
       "description": "檢視、自訂和測試用於文字整理和指令偵測的統一系統提示詞",
-      "title": "提示詞工作室"
+      "title": "提示詞工作室",
+      "enhancementTitle": "筆記增強提示詞",
+      "enhancementDescription": "用於重構和潤飾原始筆記的系統提示詞。",
+      "meetingTitle": "會議筆記提示詞",
+      "meetingDescription": "用於將雙人會議轉錄轉換為清晰行動筆記的系統提示詞。",
+      "titleGenerationTitle": "標題生成提示詞",
+      "titleGenerationDescription": "自動生成筆記標題時使用的系統提示詞。",
+      "selectionEditTitle": "選取範圍編輯提示詞",
+      "selectionEditDescription": "透過語音編輯文字選取範圍時套用的系統後綴。",
+      "toolInstructionsTitle": "智慧代理工具說明",
+      "toolInstructionsDescription": "描述聊天代理可呼叫工具的說明。留空以保留每個工具的預設值。"
     },
     "speechToText": {
       "title": "語音轉文字",
@@ -2139,6 +2162,8 @@
         "anthropic_claude_haiku_4_5": "快速且接近頂尖智慧",
         "gemini_gemini_3_5_flash": "最新、快速且高性能的 Gemini 模型",
         "gemini_gemini_3_1_pro_preview": "新一代旗艦模型，擅長複雜推理",
+        "gemini_gemini_3_5_flash_lite": "最快速、最具成本效益的 3.5 模型",
+        "gemini_gemini_3_1_flash_lite": "低成本的前沿效能",
         "gemini_gemini_3_flash_preview": "超快速、高性能的新一代模型",
         "gemini_gemini_2_5_flash_lite": "最低延遲和成本",
         "gemini_gemma_4_31b_it": "Google 最大的 Gemma 4，31B 稠密，256K 上下文",

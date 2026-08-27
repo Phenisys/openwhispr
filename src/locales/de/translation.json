@@ -1170,7 +1170,8 @@
     },
     "view": {
       "customPrompt": "Benutzerdefinierter Prompt",
-      "defaultPrompt": "Standard-Prompt","emptyPrompt": "Kein Prompt",
+      "defaultPrompt": "Standard-Prompt",
+      "emptyPrompt": "Kein Prompt",
       "modified": "Geändert"
     },
     "defaultTestInputTranslate": "Das Wetter ist heute wunderschön, hast du Lust auf einen Spaziergang?"
@@ -1724,6 +1725,18 @@
           "title": "Enterprise",
           "description": "Verwendet das Cloud-Konto Ihrer Organisation."
         }
+      },
+      "advanced": {
+        "title": "Erweitert",
+        "timeoutLabel": "Anfrage-Timeout",
+        "timeoutHelp": "Sekunden, bevor eine Inferenzanfrage abgebrochen wird.",
+        "localTimeoutLabel": "Lokales Modell-Timeout (llama.cpp)",
+        "localTimeoutHelp": "Sekunden, bevor eine lokale Inferenzanfrage abgebrochen wird.",
+        "secondsSuffix": "s",
+        "maxTokensLabel": "Max. Ausgabetokens",
+        "maxTokensHelp": "Obergrenze für generierte Tokens. 0 = automatisch.",
+        "retryLabel": "Wiederholungsversuche",
+        "retryHelp": "Wiederholungen nach fehlgeschlagener Anfrage. 0 = einzelner Versuch."
       }
     },
     "developer": {
@@ -2049,7 +2062,17 @@
     },
     "prompts": {
       "description": "Den einheitlichen System-Prompt anzeigen, anpassen und testen, der Textbereinigung und Anweisungserkennung steuert",
-      "title": "Prompt-Studio"
+      "title": "Prompt-Studio",
+      "enhancementTitle": "Notiz-Erweiterungsprompt",
+      "enhancementDescription": "Systemprompt zum Umstrukturieren und Polieren von Rohtext.",
+      "meetingTitle": "Meeting-Notizen-Prompt",
+      "meetingDescription": "Systemprompt für die Umwandlung von Dual-Speaker-Meeting-Transkripten in saubere Aktionsnotizen.",
+      "titleGenerationTitle": "Titelgenerierungs-Prompt",
+      "titleGenerationDescription": "Systemprompt zur automatischen Generierung von Notiztiteln.",
+      "selectionEditTitle": "Auswahlbearbeitungs-Prompt",
+      "selectionEditDescription": "System-Suffix beim Bearbeiten einer Textauswahl per Sprache.",
+      "toolInstructionsTitle": "Agent-Tool-Anweisungen",
+      "toolInstructionsDescription": "Anweisungen zu den Tools des Chat-Agenten. Leer lassen, um die Standardwerte beizubehalten."
     },
     "speechToText": {
       "title": "Spracherkennung",
@@ -2231,6 +2254,8 @@
         "anthropic_claude_haiku_4_5": "Schnell mit nahezu Frontier-Intelligenz",
         "gemini_gemini_3_5_flash": "Neuestes schnelles, leistungsstarkes Gemini-Modell",
         "gemini_gemini_3_1_pro_preview": "Flaggschiff der nächsten Generation für komplexes Reasoning",
+        "gemini_gemini_3_5_flash_lite": "Schnellstes, kostengünstigstes 3.5-Modell",
+        "gemini_gemini_3_1_flash_lite": "Frontier-Leistung zu geringen Kosten",
         "gemini_gemini_3_flash_preview": "Ultraschnelles Modell der nächsten Generation mit hoher Leistungsfähigkeit",
         "gemini_gemini_2_5_flash_lite": "Niedrigste Latenz und Kosten",
         "gemini_gemma_4_31b_it": "Googles größtes Gemma 4, 31B dicht, 256K Kontext",

@@ -1061,7 +1061,8 @@
     },
     "view": {
       "customPrompt": "Prompt personalizado",
-      "defaultPrompt": "Prompt padrão","emptyPrompt": "Sem prompt",
+      "defaultPrompt": "Prompt padrão",
+      "emptyPrompt": "Sem prompt",
       "modified": "Modificado"
     },
     "defaultTestInputTranslate": "O tempo está lindo hoje, quer dar um passeio?"
@@ -1425,6 +1426,18 @@
           "title": "Corporativo",
           "description": "Usando a conta de nuvem da sua organização."
         }
+      },
+      "advanced": {
+        "title": "Avançado",
+        "timeoutLabel": "Tempo limite da solicitação",
+        "timeoutHelp": "Segundos antes de uma solicitação de inferência ser abortada.",
+        "localTimeoutLabel": "Tempo limite do modelo local (llama.cpp)",
+        "localTimeoutHelp": "Segundos antes de uma solicitação de inferência local ser abortada.",
+        "secondsSuffix": "s",
+        "maxTokensLabel": "Máx. de tokens de saída",
+        "maxTokensHelp": "Limite de tokens gerados. 0 = automático.",
+        "retryLabel": "Tentativas de repetição",
+        "retryHelp": "Repetições após uma solicitação com falha. 0 = tentativa única."
       }
     },
     "developer": {
@@ -1750,7 +1763,17 @@
     },
     "prompts": {
       "description": "Visualize, personalize e teste o prompt de sistema unificado que alimenta a limpeza de texto e a detecção de instruções",
-      "title": "Estúdio de prompts"
+      "title": "Estúdio de prompts",
+      "enhancementTitle": "Prompt de aprimoramento de notas",
+      "enhancementDescription": "Prompt do sistema para reestruturar e polir notas brutas.",
+      "meetingTitle": "Prompt de notas de reunião",
+      "meetingDescription": "Prompt do sistema para transformar transcrições de reuniões com dois participantes em notas de ação limpas.",
+      "titleGenerationTitle": "Prompt de geração de título",
+      "titleGenerationDescription": "Prompt do sistema usado ao gerar títulos de notas automaticamente.",
+      "selectionEditTitle": "Prompt de edição de seleção",
+      "selectionEditDescription": "Sufixo do sistema aplicado ao editar uma seleção de texto por voz.",
+      "toolInstructionsTitle": "Instruções de ferramentas do agente",
+      "toolInstructionsDescription": "Instruções que descrevem as ferramentas que o agente de chat pode chamar. Deixe vazio para manter os padrões."
     },
     "speechToText": {
       "title": "Voz para texto",
@@ -2118,6 +2141,8 @@
         "anthropic_claude_haiku_4_5": "Rápido com inteligência quase de ponta",
         "gemini_gemini_3_5_flash": "Modelo Gemini mais recente, rápido e de alta capacidade",
         "gemini_gemini_3_1_pro_preview": "Modelo principal de nova geração para raciocínio complexo",
+        "gemini_gemini_3_5_flash_lite": "Modelo 3.5 mais rápido e econômico",
+        "gemini_gemini_3_1_flash_lite": "Desempenho de ponta a baixo custo",
         "gemini_gemini_3_flash_preview": "Modelo de nova geração ultrarápido e de alta capacidade",
         "gemini_gemini_2_5_flash_lite": "Menor latência e custo",
         "gemini_gemma_4_31b_it": "O maior Gemma 4 do Google, 31B denso, contexto 256K",
