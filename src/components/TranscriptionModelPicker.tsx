@@ -438,7 +438,7 @@ export default function TranscriptionModelPicker({
     if (!currentEntry || currentEntry.downloaded) return;
 
     const downloaded = loadedModels.filter((m) => m.downloaded);
-    onLocalModelSelectRef.current(downloaded[0]?.model ?? "", "whisper");
+    onLocalModelSelectRef.current(downloaded[0]?.model ?? "");
   }, []);
 
   const loadLocalModels = useCallback(() => {

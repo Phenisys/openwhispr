@@ -55,6 +55,11 @@ export default function LocalModelPicker({
   const [downloadedModels, setDownloadedModels] = useState<Set<string>>(new Set());
   const loadDownloadedModelsRequestRef = useRef(0);
 
+  const knownModelIds = useMemo(
+    () => new Set(providers.flatMap((provider) => provider.models.map((model) => model.id))),
+    [providers]
+  );
+
   const { confirmDialog, showConfirmDialog, hideConfirmDialog } = useDialogs();
   const styles = useMemo(() => MODEL_PICKER_COLORS[colorScheme], [colorScheme]);
 
@@ -105,12 +110,20 @@ export default function LocalModelPicker({
   useEffect(() => {
     const initAndValidate = async () => {
       const downloaded = await loadDownloadedModels();
-      if (downloaded && selectedModel && !downloaded.has(selectedModel)) {
+      // Only clear a selection this picker owns (a known model that is no
+      // longer on disk). A foreign id — e.g. a cloud model selected while
+      // the user browses the local tab — must survive untouched.
+      if (
+        downloaded &&
+        selectedModel &&
+        knownModelIds.has(selectedModel) &&
+        !downloaded.has(selectedModel)
+      ) {
         onModelSelect("");
       }
     };
     initAndValidate();
-  }, [loadDownloadedModels, selectedModel, onModelSelect]);
+  }, [loadDownloadedModels, selectedModel, onModelSelect, knownModelIds]);
 
   const handleDownloadComplete = useCallback(async () => {
     await loadDownloadedModels();
@@ -132,9 +145,25 @@ export default function LocalModelPicker({
     onModelsCleared: loadDownloadedModels,
   });
 
+  const selectionStateRef = useRef({ selectedModel, downloadedModels, knownModelIds });
+  useEffect(() => {
+    selectionStateRef.current = { selectedModel, downloadedModels, knownModelIds };
+  }, [selectedModel, downloadedModels, knownModelIds]);
+
   const handleDownload = useCallback(
     (modelId: string) => {
-      downloadModel(modelId, onModelSelect);
+      // Bootstrap only: auto-select the freshly downloaded model when there is
+      // no current selection, or the selection is a known model that was
+      // deleted. Never steal the selection from a model the user explicitly
+      // picked; a foreign selection (e.g. a cloud model id) blocks it too.
+      downloadModel(modelId, (downloadedId) => {
+        const { selectedModel: current, downloadedModels: downloaded, knownModelIds: known } =
+          selectionStateRef.current;
+        const selectionGone = known.has(current) && !downloaded.has(current);
+        if (!current || selectionGone) {
+          onModelSelect(downloadedId);
+        }
+      });
     },
     [downloadModel, onModelSelect]
   );

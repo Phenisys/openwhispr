@@ -583,7 +583,7 @@ export default function ReasoningModelSelector({
                 setBaseUrl={() => {}}
                 apiKey={openrouterApiKey}
                 setApiKey={setOpenrouterApiKey}
-                model={reasoningModel}
+                model={localReasoningProvider === OPENROUTER_TAB ? reasoningModel : ""}
                 setModel={setReasoningModel}
                 lockedBaseUrl
                 apiKeyRequired
@@ -596,7 +596,7 @@ export default function ReasoningModelSelector({
                 setBaseUrl={setCloudReasoningBaseUrl}
                 apiKey={customReasoningApiKey}
                 setApiKey={setCustomReasoningApiKey || (() => {})}
-                model={reasoningModel}
+                model={localReasoningProvider === "custom" ? reasoningModel : ""}
                 setModel={setReasoningModel}
                 defaultBaseUrl={API_ENDPOINTS.OPENAI_BASE}
               />
