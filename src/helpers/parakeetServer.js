@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const debugLogger = require("./debugLogger");
+const { createAbortError } = require("./abortError");
 const { getModelsDirForService } = require("./modelDirUtils");
 const {
   getFFmpegPath,
@@ -53,10 +54,15 @@ class ParakeetServerManager {
   async _ensureWav(audioBuffer) {
     if (isWavFormat(audioBuffer)) {
       const format = parseWavFormat(audioBuffer);
-      if (format?.sampleRate === SAMPLE_RATE && format?.channels === 1) {
+      if (
+        format?.audioFormat === 1 &&
+        format?.bitsPerSample === 16 &&
+        format?.sampleRate === SAMPLE_RATE &&
+        format?.channels === 1
+      ) {
         return { wavBuffer: audioBuffer, filesToCleanup: [] };
       }
-      debugLogger.debug("WAV input needs resampling", { format });
+      debugLogger.debug("WAV input needs normalization", { format });
     }
 
     const ffmpegPath = getFFmpegPath();
@@ -97,7 +103,9 @@ class ParakeetServerManager {
     });
 
     // An already-cancelled upload skips the ffmpeg conversion entirely.
-    throwIfAborted();
+    if (options.signal?.aborted) {
+      throw createAbortError("parakeet-server transcription cancelled");
+    }
 
     const { wavBuffer, filesToCleanup } = await this._ensureWav(audioBuffer);
     try {
