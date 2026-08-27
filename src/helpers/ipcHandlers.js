@@ -4471,10 +4471,12 @@ class IPCHandlers {
     // System audio is always capturable on Windows: via the native WASAPI
     // process-loopback helper when available (hears every output device),
     // otherwise via Chromium's default-device loopback in the renderer.
-    const getWindowsSystemAudioAccess = async () => {
-      const capability = await this.windowsLoopbackAudioManager?.getCapability().catch(() => ({
-        available: false,
-      }));
+    const getWindowsSystemAudioAccess = async ({ refreshCapability = false } = {}) => {
+      const capability = await this.windowsLoopbackAudioManager
+        ?.getCapability({ force: refreshCapability })
+        .catch(() => ({
+          available: false,
+        }));
       const helperAvailable = !!capability?.available;
 
       return buildSystemAudioAccess({
@@ -5622,7 +5624,7 @@ class IPCHandlers {
 
     const getMeetingSystemAudioMode = () => getMeetingSystemAudioCapabilityMode();
 
-    const getMeetingSystemAudioPlan = async () => {
+    const getMeetingSystemAudioPlan = async ({ refreshWindowsCapability = false } = {}) => {
       const mode = getMeetingSystemAudioMode();
       if (mode === "unsupported") {
         return { mode, strategy: "unsupported" };
@@ -5641,7 +5643,9 @@ class IPCHandlers {
       }
 
       if (process.platform === "win32") {
-        const windowsAccess = await getWindowsSystemAudioAccess();
+        const windowsAccess = await getWindowsSystemAudioAccess({
+          refreshCapability: refreshWindowsCapability,
+        });
         return { mode: windowsAccess.mode, strategy: windowsAccess.strategy };
       }
 
@@ -6673,7 +6677,7 @@ class IPCHandlers {
       meetingReconnectCount = 0;
       this.meetingDetectionEngine?.setUserRecording(true);
       try {
-        const systemAudioPlan = await getMeetingSystemAudioPlan();
+        const systemAudioPlan = await getMeetingSystemAudioPlan({ refreshWindowsCapability: true });
         let { mode: systemAudioMode, strategy: systemAudioStrategy } = systemAudioPlan;
         meetingEchoLeakDetector.reset();
         meetingOneOnOneAttendee = resolveOneOnOneAttendeeForNote(options.noteId);
@@ -6809,6 +6813,23 @@ class IPCHandlers {
       }
 
       if (source === "mic") {
+        // Until the session proves to be a call (audible system audio), keep a
+        // raw mic capture so an in-person recording can be diarized. Written
+        // pre-AEC/pre-gate so the timeline stays continuous, like the system
+        // capture above.
+        if (!meetingSystemAudioHeard) {
+          if (!meetingMicDiarizationStream) {
+            const receivedAt = Date.now();
+            meetingMicDiarizationPath = path.join(
+              os.tmpdir(),
+              `ow-diarize-raw-mic-${receivedAt}.pcm`
+            );
+            meetingMicDiarizationStream = fs.createWriteStream(meetingMicDiarizationPath);
+            meetingMicDiarizationStartedAt = receivedAt;
+          }
+          meetingMicDiarizationStream.write(outboundBuffer);
+        }
+
         if (processMeetingMicWithAec(outboundBuffer)) {
           return;
         }
@@ -9777,10 +9798,15 @@ class IPCHandlers {
           sIdx++;
         }
 
+        // Mirrors the mic-mode single-cluster softening in mergeWithTranscript:
+        // every segment stays "you", so persisting an embedding keyed to a
+        // cluster id that owns no segments would leave the note inconsistent.
+        const micSingleClusterSoftened = diarizedSource === "mic" && speakerSet.size === 1;
+
         let speakerEmbeddingsMap = null;
         const speakerEmb = require("./speakerEmbeddings");
         try {
-          if (speakerEmb.isAvailable() && tmpWav) {
+          if (!micSingleClusterSoftened && speakerEmb.isAvailable() && tmpWav) {
             const speakerIds = [...new Set(diarizationSegments.map((s) => s.speaker))];
             speakerEmbeddingsMap = {};
 
