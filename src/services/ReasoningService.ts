@@ -21,6 +21,7 @@ import { PROVIDER_REGISTRY, type ProviderContext } from "./ai/inferenceProviders
 import { getConfiguredOpenAIBase } from "./ai/openaiBase";
 import { applyThinkingSuppression } from "./ai/thinkingSuppression";
 import { detectEndpointDialect } from "./ai/thinkingSuppressionDialects";
+import { createStreamingThinkFilter } from "./ai/streamingThinkFilter";
 import { extractApiErrorMessage } from "./ai/apiErrorMessage";
 import { clearTinfoilClientCache } from "./ai/tinfoilClient";
 import { resolveChatRoute } from "../helpers/chatRouting";
@@ -566,7 +567,8 @@ class ReasoningService extends BaseReasoningService {
 
     const decoder = new TextDecoder();
     let buffer = "";
-    let insideThinkBlock = false;
+    const stripThinking = (isLocalProvider || isLanChat) && config.disableThinking !== false;
+    const filterThinkTags = stripThinking ? createStreamingThinkFilter() : null;
 
     try {
       while (true) {
@@ -582,37 +584,19 @@ class ReasoningService extends BaseReasoningService {
           if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
           const data = trimmed.slice(6);
-          if (data === "[DONE]") return;
+          if (data === "[DONE]") {
+            const trailing = filterThinkTags?.finish();
+            if (trailing) yield trailing;
+            return;
+          }
 
           try {
             const parsed = JSON.parse(data);
             let content = parsed.choices?.[0]?.delta?.content;
             if (!content) continue;
 
-            const stripThinking =
-              (isLocalProvider || isLanChat) && config.disableThinking !== false;
-            if (stripThinking) {
-              if (insideThinkBlock) {
-                const endIdx = content.indexOf("</think>");
-                if (endIdx !== -1) {
-                  insideThinkBlock = false;
-                  content = content.slice(endIdx + 8);
-                } else {
-                  continue;
-                }
-              }
-              const startIdx = content.indexOf("<think>");
-              if (startIdx !== -1) {
-                const before = content.slice(0, startIdx);
-                const after = content.slice(startIdx + 7);
-                const endIdx = after.indexOf("</think>");
-                if (endIdx !== -1) {
-                  content = before + after.slice(endIdx + 8);
-                } else {
-                  insideThinkBlock = true;
-                  content = before;
-                }
-              }
+            if (filterThinkTags) {
+              content = filterThinkTags(content);
               if (!content) continue;
             }
 
@@ -622,6 +606,9 @@ class ReasoningService extends BaseReasoningService {
           }
         }
       }
+
+      const trailing = filterThinkTags?.finish();
+      if (trailing) yield trailing;
     } finally {
       clearTimeout(timeoutId);
       this.streamAbortController = null;
@@ -664,6 +651,10 @@ class ReasoningService extends BaseReasoningService {
       return;
     }
 
+    const filterThinkTags =
+      (isLocalProvider || isLanChat) && config.disableThinking !== false
+        ? createStreamingThinkFilter()
+        : null;
     let apiKey = "";
     let baseURL: string | undefined;
 
@@ -745,10 +736,20 @@ class ReasoningService extends BaseReasoningService {
       ...(hasProviderOptions ? { providerOptions } : {}),
     });
 
+    let canFlushFilteredText = true;
+    const finishFilteredText = (): string => {
+      const trailing = filterThinkTags?.finish() ?? "";
+      return canFlushFilteredText ? trailing : "";
+    };
+
     try {
       for await (const chunk of result.fullStream) {
         if (chunk.type === "text-delta") {
-          yield { type: "content", text: chunk.text };
+          const text = filterThinkTags ? filterThinkTags(chunk.text) : chunk.text;
+          if (text) yield { type: "content", text };
+        } else if (chunk.type === "text-end" || chunk.type === "finish-step") {
+          const trailing = finishFilteredText();
+          if (trailing) yield { type: "content", text: trailing };
         } else if (chunk.type === "tool-call") {
           yield {
             type: "tool_calls",
@@ -770,11 +771,18 @@ class ReasoningService extends BaseReasoningService {
             toolName: chunk.toolName,
             displayText,
           };
+        } else if (chunk.type === "abort" || chunk.type === "error") {
+          canFlushFilteredText = false;
+          finishFilteredText();
         } else if (chunk.type === "finish") {
+          const trailing = finishFilteredText();
+          if (trailing) yield { type: "content", text: trailing };
           yield { type: "done", finishReason: chunk.finishReason };
         }
       }
     } catch (error) {
+      canFlushFilteredText = false;
+      finishFilteredText();
       if (abortController.signal.aborted) {
         yield { type: "done", finishReason: "stop" };
         return;
