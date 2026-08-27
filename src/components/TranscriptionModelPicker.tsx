@@ -642,6 +642,9 @@ export default function TranscriptionModelPicker({
     [onModeChange, ensureValidCloudSelection]
   );
 
+  // Never writes cloudTranscriptionBaseUrl: that key is the Custom tab's only
+  // storage, and built-in providers resolve their endpoints from the registry
+  // at request time — writing it here destroyed the user's URL (#1459).
   const handleCloudProviderChange = useCallback(
     (providerId: string) => {
       if (!providerAllowed(providerId)) return;
@@ -653,26 +656,6 @@ export default function TranscriptionModelPicker({
     [providerAllowed]
   );
 
-  const handleCloudModelSelect = useCallback(
-    (modelId: string) => {
-      if (browsedCloudProvider && browsedCloudProvider !== selectedCloudProvider) {
-        onCloudProviderSelect(browsedCloudProvider);
-        const provider = cloudProviders.find((p) => p.id === browsedCloudProvider);
-        if (provider) setCloudTranscriptionBaseUrl?.(provider.baseUrl);
-      }
-      onCloudModelSelect(modelId);
-      setBrowsedCloudProvider(null);
-    },
-    [
-      browsedCloudProvider,
-      selectedCloudProvider,
-      onCloudProviderSelect,
-      onCloudModelSelect,
-      cloudProviders,
-      setCloudTranscriptionBaseUrl,
-    ]
-  );
-
   const handleLocalProviderChange = useCallback(
     (providerId: string) => {
       const tab = LOCAL_PROVIDER_TABS.find((t) => t.id === providerId);
@@ -681,6 +664,20 @@ export default function TranscriptionModelPicker({
       onLocalProviderSelect?.(providerId);
     },
     [onLocalProviderSelect]
+  );
+
+  const handleCloudModelSelect = useCallback(
+    (modelId: string) => {
+      // Browsing a provider tab must not switch the active model — the model is
+      // selected deliberately (upstream 1.9.0 fix). Commit provider+model only
+      // when the user actually picks a model under the browsed tab.
+      if (browsedCloudProvider && browsedCloudProvider !== selectedCloudProvider) {
+        onCloudProviderSelect(browsedCloudProvider);
+      }
+      onCloudModelSelect(modelId);
+      setBrowsedCloudProvider(null);
+    },
+    [browsedCloudProvider, selectedCloudProvider, onCloudProviderSelect, onCloudModelSelect]
   );
 
   const handleWhisperModelSelect = useCallback(
