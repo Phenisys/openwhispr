@@ -1,11 +1,4 @@
-import {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-  type ComponentProps,
-} from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Download,
@@ -27,10 +20,7 @@ import {
   noteCapabilities,
   resolveNotePermission,
 } from "../../lib/notePermissions";
-import {
-  useSpaces,
-  navigateToContainer,
-} from "../../stores/noteStore";
+import { useSpaces, navigateToContainer } from "../../stores/noteStore";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import type { Editor } from "@tiptap/react";
 import { MeetingTranscriptChat, SelectionBar } from "./MeetingTranscriptChat";

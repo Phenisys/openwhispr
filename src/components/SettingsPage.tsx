@@ -1344,7 +1344,6 @@ export default function SettingsPage({
     window.location.reload();
   }, []);
 
-
   const renderWhisperVadSettings = () => (
     <div>
       <SectionHeader

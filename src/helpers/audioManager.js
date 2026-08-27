@@ -3422,7 +3422,6 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           model: null,
         });
       }
-
     } catch (error) {
       logger.error(
         "Failed to save discarded transcription record",
@@ -3512,7 +3511,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       const provider = this.getStreamingProvider();
       const [, wsResult] = await Promise.all([
         this.cacheMicrophoneDeviceId(),
-        (async () => {
+        async () => {
           const {
             preferredLanguage: warmupLang,
             cloudTranscriptionModel,
@@ -3536,7 +3535,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
             throw err;
           }
           return res;
-        }),
+        },
       ]);
 
       if (wsResult.success) {

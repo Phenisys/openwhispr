@@ -64,62 +64,65 @@ export const geminiProvider: InferenceProvider = {
       generationConfig,
     };
 
-    const response = await withRetry(async () => {
-      logger.logReasoning("GEMINI_REQUEST", {
-        endpoint: `${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`,
-        model,
-        hasApiKey: !!apiKey,
-        requestBody: JSON.stringify(requestBody).substring(0, 200),
-      });
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 30000);
-      try {
-        const res = await fetch(`${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
+    const response = await withRetry(
+      async () => {
+        logger.logReasoning("GEMINI_REQUEST", {
+          endpoint: `${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`,
+          model,
+          hasApiKey: !!apiKey,
+          requestBody: JSON.stringify(requestBody).substring(0, 200),
         });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          let errorData: { error?: { message?: string } | string; message?: string } = {
-            error: res.statusText,
-          };
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || res.statusText };
-          }
-
-          logger.logReasoning("GEMINI_API_ERROR_DETAIL", {
-            status: res.status,
-            statusText: res.statusText,
-            error: errorData,
-            fullResponse: errorText.substring(0, 500),
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 30000);
+        try {
+          const res = await fetch(`${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
           });
 
-          const errMsg = extractApiErrorMessage(errorData, `Gemini API error: ${res.status}`);
-          throw httpError(errMsg, res.status);
-        }
+          if (!res.ok) {
+            const errorText = await res.text();
+            let errorData: { error?: { message?: string } | string; message?: string } = {
+              error: res.statusText,
+            };
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText || res.statusText };
+            }
 
-        const jsonResponse = (await res.json()) as GeminiResponse;
-        logger.logReasoning("GEMINI_RAW_RESPONSE", {
-          hasResponse: !!jsonResponse,
-          hasCandidates: !!jsonResponse?.candidates,
-          candidatesLength: jsonResponse?.candidates?.length || 0,
-        });
-        return jsonResponse;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          throw new Error("Request timed out after 30s");
+            logger.logReasoning("GEMINI_API_ERROR_DETAIL", {
+              status: res.status,
+              statusText: res.statusText,
+              error: errorData,
+              fullResponse: errorText.substring(0, 500),
+            });
+
+            const errMsg = extractApiErrorMessage(errorData, `Gemini API error: ${res.status}`);
+            throw httpError(errMsg, res.status);
+          }
+
+          const jsonResponse = (await res.json()) as GeminiResponse;
+          logger.logReasoning("GEMINI_RAW_RESPONSE", {
+            hasResponse: !!jsonResponse,
+            hasCandidates: !!jsonResponse?.candidates,
+            candidatesLength: jsonResponse?.candidates?.length || 0,
+          });
+          return jsonResponse;
+        } catch (error) {
+          if ((error as Error).name === "AbortError") {
+            throw new Error("Request timed out after 30s");
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
         }
-        throw error;
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
+      },
+      { ...createApiRetryStrategy(), maxRetries: config.maxRetries }
+    );
 
     const candidate = response.candidates?.[0];
     if (config.requireCompleteOutput && candidate?.finishReason === "MAX_TOKENS") {

@@ -1,14 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePolicyStore } from "../stores/policyStore";
-import {
-  Sliders,
-  Mic,
-  Brain,
-  Wrench,
-  Keyboard,
-  Shield,
-} from "lucide-react";
+import { Sliders, Mic, Brain, Wrench, Keyboard, Shield } from "lucide-react";
 import SidebarModal, { type SidebarItem } from "./ui/SidebarModal";
 import SettingsPage, { SettingsSectionType } from "./SettingsPage";
 

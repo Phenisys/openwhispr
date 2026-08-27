@@ -356,7 +356,6 @@ class MeetingDetectionEngine {
     return suppressed;
   }
 
-
   // Calendar reminders enter the same pipeline as mic detections, so they share
   // the recording gates, queueing, cooldowns, and the overlay window.
   handleCalendarReminder(event) {

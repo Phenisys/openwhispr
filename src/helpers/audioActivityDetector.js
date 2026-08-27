@@ -71,11 +71,7 @@ class AudioActivityDetector extends EventEmitter {
         this._sustainedTimer = null;
         if (this._userRecording || this.hasPrompted) return;
         this.hasPrompted = true;
-        debugLogger.info(
-          "Sustained audio activity detected (post-gate)",
-          {},
-          "meeting"
-        );
+        debugLogger.info("Sustained audio activity detected (post-gate)", {}, "meeting");
         this.emit("sustained-audio-detected", {});
       }, SUSTAINED_EVENT_DRIVEN_MS);
     }

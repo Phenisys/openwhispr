@@ -186,108 +186,111 @@ export const openaiProvider: InferenceProvider = {
     }
 
     const retryStrategy = createApiRetryStrategy();
-    const response = await withRetry(async () => {
-      let lastError: Error | null = null;
-      let lastRetryableError: Error | null = null;
+    const response = await withRetry(
+      async () => {
+        let lastError: Error | null = null;
+        let lastRetryableError: Error | null = null;
 
-      for (const { url: endpoint, type } of endpointCandidates) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          config.timeoutMs ?? REQUEST_TIMEOUT_MS
-        );
-        try {
-          const maxTokens =
-            config.maxTokens ||
-            Math.max(
-              4096,
-              ctx.calculateMaxTokens(
-                text.length,
-                TOKEN_LIMITS.MIN_TOKENS,
-                TOKEN_LIMITS.MAX_TOKENS,
-                TOKEN_LIMITS.TOKEN_MULTIPLIER
-              )
-            );
+        for (const { url: endpoint, type } of endpointCandidates) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(
+            () => controller.abort(),
+            config.timeoutMs ?? REQUEST_TIMEOUT_MS
+          );
+          try {
+            const maxTokens =
+              config.maxTokens ||
+              Math.max(
+                4096,
+                ctx.calculateMaxTokens(
+                  text.length,
+                  TOKEN_LIMITS.MIN_TOKENS,
+                  TOKEN_LIMITS.MAX_TOKENS,
+                  TOKEN_LIMITS.TOKEN_MULTIPLIER
+                )
+              );
 
-          // A known endpoint host knows its own request shape better than the model id does.
-          const apiConfig = dialect ?? getOpenAiApiConfig(model, resolvedProvider);
-          const requestBody: Record<string, unknown> = { model };
+            // A known endpoint host knows its own request shape better than the model id does.
+            const apiConfig = dialect ?? getOpenAiApiConfig(model, resolvedProvider);
+            const requestBody: Record<string, unknown> = { model };
 
-          if (type === "responses") {
-            requestBody.input = messages;
-            requestBody.store = false;
-            requestBody.max_output_tokens = maxTokens;
-          } else {
-            requestBody.messages = messages;
-            requestBody[apiConfig.tokenParam] = maxTokens;
-            if (isCleanup && model.includes("gpt-oss")) {
-              requestBody.reasoning_effort = "low";
+            if (type === "responses") {
+              requestBody.input = messages;
+              requestBody.store = false;
+              requestBody.max_output_tokens = maxTokens;
+            } else {
+              requestBody.messages = messages;
+              requestBody[apiConfig.tokenParam] = maxTokens;
+              if (isCleanup && model.includes("gpt-oss")) {
+                requestBody.reasoning_effort = "low";
+              }
+              applyThinkingSuppression(requestBody, model, resolvedProvider, config, openAiBase);
             }
-            applyThinkingSuppression(requestBody, model, resolvedProvider, config, openAiBase);
-          }
 
-          if (apiConfig.supportsTemperature) {
-            requestBody.temperature = config.temperature ?? (isCleanup ? 0 : 0.3);
-          }
+            if (apiConfig.supportsTemperature) {
+              requestBody.temperature = config.temperature ?? (isCleanup ? 0 : 0.3);
+            }
 
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(requestBody),
-            signal: controller.signal,
-          });
+            const res = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify(requestBody),
+              signal: controller.signal,
+            });
 
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({ error: res.statusText }));
-            const errorMessage = extractApiErrorMessage(
-              errorData,
-              `OpenAI API error: ${res.status}`
-            );
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ error: res.statusText }));
+              const errorMessage = extractApiErrorMessage(
+                errorData,
+                `OpenAI API error: ${res.status}`
+              );
 
-            const isUnsupportedEndpoint =
-              (res.status === 404 || res.status === 405) && type === "responses";
+              const isUnsupportedEndpoint =
+                (res.status === 404 || res.status === 405) && type === "responses";
 
-            if (isUnsupportedEndpoint) {
-              lastError = httpError(errorMessage, res.status);
-              rememberPreference(openAiBase, "chat");
+              if (isUnsupportedEndpoint) {
+                lastError = httpError(errorMessage, res.status);
+                rememberPreference(openAiBase, "chat");
+                logger.logReasoning("OPENAI_ENDPOINT_FALLBACK", {
+                  attemptedEndpoint: endpoint,
+                  error: errorMessage,
+                });
+                continue;
+              }
+
+              throw httpError(errorMessage, res.status);
+            }
+
+            rememberPreference(openAiBase, type);
+            return res.json();
+          } catch (error) {
+            if ((error as Error).name === "AbortError") {
+              throw new Error("Request timed out after 30s");
+            }
+            lastError = error as Error;
+            if (retryStrategy.shouldRetry(lastError)) {
+              lastRetryableError = lastError;
+            }
+            if (type === "responses") {
               logger.logReasoning("OPENAI_ENDPOINT_FALLBACK", {
                 attemptedEndpoint: endpoint,
-                error: errorMessage,
+                error: (error as Error).message,
               });
               continue;
             }
-
-            throw httpError(errorMessage, res.status);
+            throw lastRetryableError || error;
+          } finally {
+            clearTimeout(timeoutId);
           }
-
-          rememberPreference(openAiBase, type);
-          return res.json();
-        } catch (error) {
-          if ((error as Error).name === "AbortError") {
-            throw new Error("Request timed out after 30s");
-          }
-          lastError = error as Error;
-          if (retryStrategy.shouldRetry(lastError)) {
-            lastRetryableError = lastError;
-          }
-          if (type === "responses") {
-            logger.logReasoning("OPENAI_ENDPOINT_FALLBACK", {
-              attemptedEndpoint: endpoint,
-              error: (error as Error).message,
-            });
-            continue;
-          }
-          throw lastRetryableError || error;
-        } finally {
-          clearTimeout(timeoutId);
         }
-      }
 
-      throw lastRetryableError || lastError || new Error("No OpenAI endpoint responded");
-    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
+        throw lastRetryableError || lastError || new Error("No OpenAI endpoint responded");
+      },
+      { ...createApiRetryStrategy(), maxRetries: config.maxRetries }
+    );
 
     const isResponsesApi = Array.isArray(response?.output);
     const isChatCompletions = Array.isArray(response?.choices);

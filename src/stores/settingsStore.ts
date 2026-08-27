@@ -1146,13 +1146,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   remoteTranscriptionModel: readString("remoteTranscriptionModel", ""),
   cleanupMode: (() => {
     const v = readString("cleanupMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1201,13 +1195,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   noteFormattingMode: (() => {
     const v = readString("noteFormattingMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1220,13 +1208,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   translationMode: (() => {
     const v = readString("translationMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1324,13 +1306,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   chatAgentCloudMode: readString("chatAgentCloudMode", "byok"),
   chatAgentMode: (() => {
     const v = readString("chatAgentMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1340,13 +1316,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   dictationAgentMode: (() => {
     const v = readString("dictationAgentMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1448,15 +1418,13 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setCustomDictionary: (words: string[]) => {
     if (isBrowser) localStorage.setItem("customDictionary", JSON.stringify(words));
     set({ customDictionary: words });
-    window.electronAPI
-      ?.setDictionary(words)
-      .catch((err) => {
-        logger.warn(
-          "Failed to sync dictionary to SQLite",
-          { error: (err as Error).message },
-          "settings"
-        );
-      });
+    window.electronAPI?.setDictionary(words).catch((err) => {
+      logger.warn(
+        "Failed to sync dictionary to SQLite",
+        { error: (err as Error).message },
+        "settings"
+      );
+    });
   },
 
   updateCustomDictionary: ({ add = [], remove = [] }) => {
@@ -1507,15 +1475,13 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setSnippets: (snippets: Snippet[]) => {
     if (isBrowser) localStorage.setItem("snippets", JSON.stringify(snippets));
     set({ snippets });
-    window.electronAPI
-      ?.setSnippets?.(snippets)
-      .catch((err) => {
-        logger.warn(
-          "Failed to sync snippets to SQLite",
-          { error: (err as Error).message },
-          "settings"
-        );
-      });
+    window.electronAPI?.setSnippets?.(snippets).catch((err) => {
+      logger.warn(
+        "Failed to sync snippets to SQLite",
+        { error: (err as Error).message },
+        "settings"
+      );
+    });
   },
 
   // For broadcasts from main process — DB is already authoritative, only update UI.

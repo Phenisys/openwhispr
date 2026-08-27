@@ -488,7 +488,9 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         return (
           <div className="flex flex-col items-center justify-center gap-4 py-4 text-center">
             <Sparkles className="w-10 h-10 text-primary/80" />
-            <h2 className="text-2xl font-semibold text-foreground">{t("onboarding.welcome.title")}</h2>
+            <h2 className="text-2xl font-semibold text-foreground">
+              {t("onboarding.welcome.title")}
+            </h2>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
               {t("onboarding.welcome.subtitle")}
             </p>

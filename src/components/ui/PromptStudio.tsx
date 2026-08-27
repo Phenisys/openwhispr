@@ -100,9 +100,11 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
 
   // System prompts without a natural "input → output" test surface
   // (title generation, selection editing, tool instructions).
-  const canTest = !new Set<PromptKind>(["titleGeneration", "selectionEdit", "toolInstructions"]).has(
-    kind
-  );
+  const canTest = !new Set<PromptKind>([
+    "titleGeneration",
+    "selectionEdit",
+    "toolInstructions",
+  ]).has(kind);
 
   const customPrompt = useSettingsStore((s) => s.customPrompts[kind]);
   const setCustomPrompt = useSettingsStore((s) => s.setCustomPrompt);
@@ -315,7 +317,9 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
   const tabs = [
     { id: "current" as const, label: t("promptStudio.tabs.view"), icon: Eye },
     { id: "edit" as const, label: t("promptStudio.tabs.customize"), icon: Edit3 },
-    ...(canTest ? [{ id: "test" as const, label: t("promptStudio.tabs.test"), icon: TestTube }] : []),
+    ...(canTest
+      ? [{ id: "test" as const, label: t("promptStudio.tabs.test"), icon: TestTube }]
+      : []),
   ];
 
   return (

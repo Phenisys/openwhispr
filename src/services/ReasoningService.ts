@@ -252,74 +252,77 @@ class ReasoningService extends BaseReasoningService {
       requestBody: JSON.stringify(requestBody).substring(0, 200),
     });
 
-    const response = await withRetry(async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 30000);
-      try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        if (apiKey) {
-          headers["Authorization"] = `Bearer ${apiKey}`;
-        }
-
-        const res = await fetchWithReasoningFieldFallback(
-          () =>
-            fetch(endpoint, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(requestBody),
-              signal: controller.signal,
-            }),
-          requestBody,
-          `${providerName.toUpperCase()}_REASONING_FIELD_RETRY`
-        );
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          let errorData: any = { error: res.statusText };
-
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || res.statusText };
+    const response = await withRetry(
+      async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 30000);
+        try {
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (apiKey) {
+            headers["Authorization"] = `Bearer ${apiKey}`;
           }
 
-          const errorMessage = extractApiErrorMessage(
-            errorData,
-            `${providerName} API error: ${res.status}`
+          const res = await fetchWithReasoningFieldFallback(
+            () =>
+              fetch(endpoint, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+              }),
+            requestBody,
+            `${providerName.toUpperCase()}_REASONING_FIELD_RETRY`
           );
 
-          logger.logReasoning(`${providerName.toUpperCase()}_API_ERROR_DETAIL`, {
-            status: res.status,
-            statusText: res.statusText,
-            error: errorData,
-            errorMessage,
-            fullResponse: errorText.substring(0, 500),
+          if (!res.ok) {
+            const errorText = await res.text();
+            let errorData: any = { error: res.statusText };
+
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText || res.statusText };
+            }
+
+            const errorMessage = extractApiErrorMessage(
+              errorData,
+              `${providerName} API error: ${res.status}`
+            );
+
+            logger.logReasoning(`${providerName.toUpperCase()}_API_ERROR_DETAIL`, {
+              status: res.status,
+              statusText: res.statusText,
+              error: errorData,
+              errorMessage,
+              fullResponse: errorText.substring(0, 500),
+            });
+            throw httpError(errorMessage, res.status);
+          }
+
+          const jsonResponse = await res.json();
+
+          logger.logReasoning(`${providerName.toUpperCase()}_RAW_RESPONSE`, {
+            hasResponse: !!jsonResponse,
+            responseKeys: jsonResponse ? Object.keys(jsonResponse) : [],
+            hasChoices: !!jsonResponse?.choices,
+            choicesLength: jsonResponse?.choices?.length || 0,
+            fullResponse: JSON.stringify(jsonResponse).substring(0, 500),
           });
-          throw httpError(errorMessage, res.status);
+
+          return jsonResponse;
+        } catch (error) {
+          if ((error as Error).name === "AbortError") {
+            throw new Error("Request timed out after 30s");
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        const jsonResponse = await res.json();
-
-        logger.logReasoning(`${providerName.toUpperCase()}_RAW_RESPONSE`, {
-          hasResponse: !!jsonResponse,
-          responseKeys: jsonResponse ? Object.keys(jsonResponse) : [],
-          hasChoices: !!jsonResponse?.choices,
-          choicesLength: jsonResponse?.choices?.length || 0,
-          fullResponse: JSON.stringify(jsonResponse).substring(0, 500),
-        });
-
-        return jsonResponse;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          throw new Error("Request timed out after 30s");
-        }
-        throw error;
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
+      },
+      { ...createApiRetryStrategy(), maxRetries: config.maxRetries }
+    );
 
     if (!response.choices || !response.choices[0]) {
       logger.logReasoning(`${providerName.toUpperCase()}_RESPONSE_ERROR`, {
