@@ -6,7 +6,6 @@ import TranscriptionItem from "./ui/TranscriptionItem";
 import type { TranscriptionItem as TranscriptionItemType } from "../types/electron";
 import { formatHotkeyLabel, parseHotkeyList } from "../utils/hotkeys";
 import { formatDateGroup } from "../utils/dateFormatting";
-import { cn } from "./lib/utils";
 import { useUpcomingEvents } from "../hooks/useUpcomingEvents";
 import UpcomingMeetings from "./UpcomingMeetings";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -89,7 +88,7 @@ export default function HistoryView({
 
   return (
     <div className="px-4 pt-4 pb-6">
-      <div className={cn("mx-auto", isConnected ? "max-w-5xl" : "max-w-3xl")}>
+      <div className="mx-auto max-w-5xl">
         {history.length === 0 && <div className="mb-2 flex justify-end">{discardedToggle}</div>}
 
         {!useCleanupModel && !aiCTADismissed && (
