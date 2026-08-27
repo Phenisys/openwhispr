@@ -157,8 +157,11 @@ export default function LocalModelPicker({
       // deleted. Never steal the selection from a model the user explicitly
       // picked; a foreign selection (e.g. a cloud model id) blocks it too.
       downloadModel(modelId, (downloadedId) => {
-        const { selectedModel: current, downloadedModels: downloaded, knownModelIds: known } =
-          selectionStateRef.current;
+        const {
+          selectedModel: current,
+          downloadedModels: downloaded,
+          knownModelIds: known,
+        } = selectionStateRef.current;
         const selectionGone = known.has(current) && !downloaded.has(current);
         if (!current || selectionGone) {
           onModelSelect(downloadedId);

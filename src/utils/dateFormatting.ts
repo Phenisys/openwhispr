@@ -42,10 +42,7 @@ export function parseEventDate(value: string): Date | null {
 }
 
 export function formatUpcomingDateGroup(date: Date | string, t: (key: string) => string): string {
-  const d =
-    typeof date === "string"
-      ? (parseEventDate(date) ?? new Date(date))
-      : date;
+  const d = typeof date === "string" ? (parseEventDate(date) ?? new Date(date)) : date;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(today);
