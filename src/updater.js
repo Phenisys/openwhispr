@@ -1,6 +1,7 @@
 const { autoUpdater } = require("electron-updater");
 const fs = require("fs");
 const path = require("path");
+const { appUpdatesEnabled } = require("./helpers/updateCheckPolicy");
 
 // The update feed is configurable per build: a packed update-feed.json
 // (declared in electron-builder.json extraResources) overrides the upstream
@@ -318,16 +319,27 @@ class UpdateManager {
 
   checkForUpdatesOnStartup() {
     if (process.env.NODE_ENV !== "development") {
-      setTimeout(() => {
-        console.log("🔄 Checking for updates on startup...");
+      // Prefs are read at fire time so toggling "App updates" works without a
+      // restart; with the toggle off the app never reaches the update feed
+      // (#1605).
+      const maybeCheck = () => {
+        if (!appUpdatesEnabled(this.windowManager?.notificationPrefs)) {
+          console.log("🔄 App updates disabled — skipping update check");
+          return;
+        }
         autoUpdater.checkForUpdates().catch((err) => {
           console.error("Startup update check failed:", err);
         });
-      }, 3000);
+      };
+      setTimeout(maybeCheck, 3000);
 
       const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
       this.updateCheckInterval = setInterval(() => {
         console.log("🔄 Periodic update check...");
+        if (!appUpdatesEnabled(this.windowManager?.notificationPrefs)) {
+          console.log("🔄 App updates disabled — skipping update check");
+          return;
+        }
         autoUpdater.checkForUpdates().catch((err) => {
           console.error("Periodic update check failed:", err);
         });
