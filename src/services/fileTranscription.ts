@@ -5,6 +5,9 @@ export interface FileTranscriptionResult {
   code?: string;
   diarized?: boolean;
   warning?: string;
+  // Segment-level timing from BYOK providers that support it (opts.timestamps
+  // or BYOK diarization). Absent whenever the provider returned text only.
+  segments?: Array<{ text: string; start: number; end: number; speaker?: string }>;
 }
 
 export interface DiarizationSettings {
@@ -38,7 +41,7 @@ export async function transcribeFile(
   filePath: string,
   cfg: FileTranscriptionConfig,
   diarize: boolean,
-  opts: { requestId?: string } = {}
+  opts: { requestId?: string; timestamps?: boolean } = {}
 ): Promise<FileTranscriptionResult> {
   if (cfg.useLocalWhisper) {
     return window.electronAPI.transcribeAudioFile(filePath, {
@@ -62,6 +65,7 @@ export async function transcribeFile(
     transcriptionMode: cfg.transcriptionMode,
     remoteTranscriptionUrl: cfg.remoteTranscriptionUrl,
     remoteTranscriptionModel: cfg.remoteTranscriptionModel,
+    timestamps: opts.timestamps || undefined,
   });
 }
 
@@ -89,9 +93,10 @@ export async function transcribeFileWithSpeakers(
   cfg: FileTranscriptionConfig,
   diarization: DiarizationSettings,
   durationSeconds?: number | null,
-  opts: { requestId?: string } = {}
+  opts: { requestId?: string; timestamps?: boolean } = {}
 ): Promise<FileTranscriptionResult> {
   const byokDiarize = shouldUseByokDiarize(cfg, diarization.enabled);
+  const wantTimestamps = opts.timestamps === true && !byokDiarize;
   const diarizePromise =
     diarization.enabled && diarization.localModelsReady && !byokDiarize
       ? (window.electronAPI
@@ -102,7 +107,7 @@ export async function transcribeFileWithSpeakers(
       : Promise.resolve(null);
 
   const [result, diar] = await Promise.all([
-    transcribeFile(filePath, cfg, byokDiarize, opts),
+    transcribeFile(filePath, cfg, byokDiarize, { ...opts, timestamps: wantTimestamps }),
     diarizePromise,
   ]);
 

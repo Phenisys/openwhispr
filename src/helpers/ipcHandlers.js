@@ -7724,6 +7724,7 @@ class IPCHandlers {
           transcriptionMode,
           remoteTranscriptionUrl,
           remoteTranscriptionModel,
+          timestamps,
         }
       ) => {
         const fs = require("fs");
@@ -7858,6 +7859,10 @@ class IPCHandlers {
                 { baseUrl }
               );
             }
+          } else if (timestamps) {
+            const { timestampRequestFields } = require("./uploadTimestamps");
+            const fields = timestampRequestFields(provider, model);
+            if (fields) Object.assign(multipartFields, fields);
           }
 
           const { body, boundary } = buildMultipartBody(
@@ -7915,6 +7920,12 @@ class IPCHandlers {
 
           if (diarize) {
             debugLogger.warn("BYOK diarization requested but provider returned no speaker data");
+          }
+
+          if (timestamps) {
+            const { mapVerboseSegments } = require("./uploadTimestamps");
+            const segments = mapVerboseSegments(data.data);
+            if (segments) return { success: true, text: data.data.text, segments };
           }
           return { success: true, text: data.data.text };
         } catch (error) {

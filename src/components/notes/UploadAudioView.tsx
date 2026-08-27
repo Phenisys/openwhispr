@@ -610,7 +610,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
           numSpeakers: diarizationNumSpeakers ? Number(diarizationNumSpeakers) : null,
         },
         currentFile.durationSeconds,
-        { requestId }
+        { requestId, timestamps: true }
       ).finally(() => {
         if (activeRequestIdRef.current === requestId) activeRequestIdRef.current = null;
       });
@@ -641,14 +641,20 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
         }
 
         const folderId = selectedFolderId ? Number(selectedFolderId) : null;
-        const noteRes = await window.electronAPI.saveNote(
+        const { saveUploadNote } = await import("../../services/uploadNotes");
+        const noteRes = await saveUploadNote({
           title,
-          res.text,
-          "upload",
-          currentFile.name,
-          null,
-          folderId
-        );
+          text: res.text,
+          sourceName: currentFile.name,
+          folderId,
+          diarization: {
+            enabled: diarizationEnabled,
+            localModelsReady: !!diarizationModelsReady,
+            numSpeakers: diarizationNumSpeakers ? Number(diarizationNumSpeakers) : null,
+          },
+          durationSeconds: currentFile.durationSeconds,
+          segments: res.segments,
+        });
         if (runId !== runIdRef.current) return;
         if (noteRes.success && noteRes.note) setNoteId(noteRes.note.id);
         if (currentTempPath) {

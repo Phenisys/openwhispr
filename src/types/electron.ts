@@ -1713,11 +1713,13 @@ declare global {
         transcriptionMode?: string;
         remoteTranscriptionUrl?: string;
         remoteTranscriptionModel?: string;
+        timestamps?: boolean;
       }) => Promise<{
         success: boolean;
         text?: string;
         error?: string;
         diarized?: boolean;
+        segments?: Array<{ text: string; start: number; end: number; speaker?: string }>;
       }>;
 
       // Usage limit events
