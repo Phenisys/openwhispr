@@ -95,3 +95,21 @@ test("upcoming groups fall back to a formatted date further out", async (t2) => 
   assert.notEqual(result, "Today");
   assert.notEqual(result, "Tomorrow");
 });
+
+test("date-only event starts group on the local calendar day, not UTC midnight", async (t2) => {
+  const { formatUpcomingDateGroup } = await load();
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = "America/Los_Angeles";
+
+  try {
+    t2.mock.timers.enable({ apis: ["Date"], now: new Date("2024-06-15T12:00:00Z") });
+
+    // 2024-06-15 as a date-only value must read as June 15 locally (west of
+    // UTC it would otherwise be June 14 17:00 PDT).
+    assert.equal(formatUpcomingDateGroup("2024-06-15", t), "Today");
+    assert.equal(formatUpcomingDateGroup("2024-06-16", t), "Tomorrow");
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
