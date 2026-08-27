@@ -327,3 +327,39 @@ test("empty replacement output is rejected without consuming a paste", async () 
   });
   assert.equal(pastes.length, 0);
 });
+
+// The Windows paste path restores the window captured at record start (#859).
+// getWinTargetHwnd hands the paste that HWND exactly as --detect-only printed
+// it ("TARGET %p", hex) so the binary's base-16 --restore-window parse round-trips.
+test("getWinTargetHwnd returns the hex HWND a win32 probe captured (#859)", async () => {
+  const clipboardManager = { runClipboardOperation: (operation) => operation() };
+  const manager = new SelectionManager({
+    clipboardManager,
+    textEditMonitor: {},
+    platform: "win32",
+    now: () => 1000,
+  });
+  manager._probeTarget = async () => ({
+    kind: "win-hwnd",
+    id: "00001A2B",
+    windowClass: "Chrome_WidgetWin_1",
+    exeName: "chrome.exe",
+  });
+
+  await manager.captureTarget();
+  assert.equal(await manager.getWinTargetHwnd(), "00001A2B");
+});
+
+test("getWinTargetHwnd returns null without a win32 capture (#859)", async () => {
+  const clipboardManager = { runClipboardOperation: (operation) => operation() };
+  const manager = new SelectionManager({
+    clipboardManager,
+    textEditMonitor: {},
+    platform: "win32",
+    now: () => 1000,
+  });
+  manager._probeTarget = async () => null;
+
+  await manager.captureTarget();
+  assert.equal(await manager.getWinTargetHwnd(), null);
+});
