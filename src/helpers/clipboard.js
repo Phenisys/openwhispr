@@ -89,6 +89,9 @@ const LINUX_TERMINAL_CLASSES = [
   "warp",
   "termius",
   "waveterm",
+  "ptyxis",
+  "kgx",
+  "org.gnome.console",
 ];
 
 function writeClipboardInRenderer(webContents, text) {
