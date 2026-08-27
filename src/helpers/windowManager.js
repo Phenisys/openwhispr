@@ -133,10 +133,17 @@ class WindowManager {
     if (!this.notificationWindow || this.notificationWindow.isDestroyed()) {
       return;
     }
+    // Linux ignores the `forward` option, so a card returned to click-through
+    // there never sees another mouseenter and Start/Dismiss stay unreachable
+    // for the rest of its life (#1456). It is only click-through on macOS to
+    // begin with, so on Linux leave the hit-testing alone.
+    const togglesClickThrough = process.platform !== "linux";
     if (interactive) {
-      this.notificationWindow.setIgnoreMouseEvents(false);
+      if (togglesClickThrough) this.notificationWindow.setIgnoreMouseEvents(false);
     } else {
-      this.notificationWindow.setIgnoreMouseEvents(true, { forward: true });
+      if (togglesClickThrough) {
+        this.notificationWindow.setIgnoreMouseEvents(true, { forward: true });
+      }
     }
   }
 
