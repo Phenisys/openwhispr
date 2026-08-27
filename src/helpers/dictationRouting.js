@@ -38,7 +38,33 @@ export function resolveDictationAgentProvider({
 }) {
   if (isCloudAgent) return "openwhispr";
   if (dictationAgentMode === "local") return "local";
+  // Self-hosted routes by endpoint, so a leftover cloud id would send the
+  // request off-device. Mirrors buildNoteFormattingOverrides.
+  if (dictationAgentMode === "self-hosted") return undefined;
   return dictationAgentProvider?.trim() || undefined;
+}
+
+// Provider id the translate steps hand to ReasoningService. An empty provider
+// in local mode still routes to llama.cpp instead of cleanup-scope heuristics.
+export function resolveTranslationProviderId({
+  isCloudTranslation,
+  translationMode,
+  translationProvider,
+}) {
+  if (isCloudTranslation) return "openwhispr";
+  const provider = translationProvider?.trim();
+  if (provider) return provider;
+  return translationMode === "local" ? "local" : undefined;
+}
+
+// Wake-word cues gate on the explicit dictation language, then the language
+// detected by STT, with the UI language as the final hint under auto-detect.
+export function resolveWakeWordLanguage({ preferredLanguage, uiLanguage }, detectedLanguage) {
+  const language = typeof preferredLanguage === "string" ? preferredLanguage.trim() : "";
+  if (language && language.toLowerCase() !== "auto") return language;
+  const detected = typeof detectedLanguage === "string" ? detectedLanguage.trim() : "";
+  if (detected && detected.toLowerCase() !== "auto") return detected;
+  return typeof uiLanguage === "string" ? uiLanguage : undefined;
 }
 
 // Decides which reasoning path ("translation" | "agent" | "cleanup" | "skip")

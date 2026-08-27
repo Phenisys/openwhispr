@@ -180,6 +180,17 @@ export const useAudioRecording = (toast, options = {}) => {
           window.electronAPI?.resumeMediaPlayback?.();
         }
       },
+      onNoAudio: () => {
+        window.electronAPI?.hideDictationPreview?.();
+        if (getSettings().pauseMediaOnDictation) {
+          window.electronAPI?.resumeMediaPlayback?.();
+        }
+        toast({
+          title: t("hooks.audioRecording.noAudio.title"),
+          description: t("hooks.audioRecording.noAudio.description"),
+          variant: "default",
+        });
+      },
       onPartialTranscript: (text) => {
         setPartialTranscript(text);
       },
@@ -371,6 +382,7 @@ export const useAudioRecording = (toast, options = {}) => {
     });
 
     const handleNoAudioDetected = () => {
+      window.electronAPI?.hideDictationPreview?.();
       if (getSettings().pauseMediaOnDictation) {
         window.electronAPI?.resumeMediaPlayback?.();
       }

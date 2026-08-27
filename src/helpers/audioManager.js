@@ -62,13 +62,19 @@ import {
 import { detectAgentName } from "../config/agentDetection";
 import {
   resolveDictationRouteKind,
+  resolveWakeWordLanguage,
   resolveDictationTranslationReachability,
+  resolveTranslationProviderId,
 } from "./dictationRouting";
 import { resolveDictationAgentInference } from "./dictationAgentInference";
 import { resolvePrompt } from "../config/prompts";
 import { evaluateFinishedRecording, withSalvageWarning } from "./recordingValidation";
 import { isEmptyRecording } from "./recordingGuard";
-import { matchesDictionaryPrompt } from "../utils/dictionaryEchoFilter.js";
+import {
+  DICTIONARY_ECHO_CODE,
+  dictionaryEchoError,
+  matchesDictionaryPrompt,
+} from "../utils/dictionaryEchoFilter.js";
 import { getDictionaryHintWords } from "../utils/snippets";
 import {
   buildSelectionEditSystemPrompt,
@@ -115,7 +121,8 @@ function resolveReasoningRoute(
   settings,
   agentName,
   voiceAgentRequested,
-  translationRequested
+  translationRequested,
+  detectedLanguage
 ) {
   const cleanupReachable =
     !!settings.useCleanupModel && (!!settings.cleanupModel?.trim() || isCloudCleanupMode());
@@ -137,7 +144,11 @@ function resolveReasoningRoute(
   const kind = resolveDictationRouteKind({
     cleanupReachable,
     agentReachable: agent.reachable,
-    agentInvoked: !!agentName && detectAgentName(text, agentName),
+    // A translation recording never routes to the agent, so skip the scan.
+    agentInvoked:
+      !translationRequested &&
+      !!agentName &&
+      detectAgentName(text, agentName, resolveWakeWordLanguage(settings, detectedLanguage)),
     voiceAgentRequested,
     translationRequested,
     translationReachable,
@@ -154,9 +165,11 @@ function resolveReasoningRoute(
     );
   }
   if (kind === "translation") {
-    const provider = isCloudTranslation
-      ? "openwhispr"
-      : settings.translationProvider?.trim() || undefined;
+    const provider = resolveTranslationProviderId({
+      isCloudTranslation,
+      translationMode: settings.translationMode,
+      translationProvider: settings.translationProvider,
+    });
     const isCustomTranslation = settings.translationMode === "providers" && provider === "custom";
     return {
       kind: "translation",
@@ -235,6 +248,11 @@ const isValidApiKey = (key, provider = "openai") => {
   return key !== placeholder;
 };
 
+// Realtime providers expose no finalize handshake (unlike Deepgram/AssemblyAI/
+// Corti), so the transcript tail lands whenever it lands — wait, don't sleep.
+const STREAMING_FINAL_QUIET_MS = 250;
+const STREAMING_FINAL_CEILING_MS = 2000;
+
 const STREAMING_PROVIDERS = {
   deepgram: {
     warmup: (opts) => window.electronAPI.deepgramStreamingWarmup(opts),
@@ -261,6 +279,7 @@ const STREAMING_PROVIDERS = {
     onSessionEnd: (cb) => window.electronAPI.onAssemblyAiSessionEnd(cb),
   },
   "openai-realtime": {
+    awaitsFinalTranscript: true,
     warmup: (opts) => window.electronAPI.dictationRealtimeWarmup(opts),
     start: (opts) => window.electronAPI.dictationRealtimeStart(opts),
     send: (buf) => window.electronAPI.dictationRealtimeSend(buf),
@@ -283,6 +302,7 @@ const STREAMING_PROVIDERS = {
     onSessionEnd: (cb) => window.electronAPI.onCortiSessionEnd(cb),
   },
   "tinfoil-realtime": {
+    awaitsFinalTranscript: true,
     warmup: (opts) =>
       window.electronAPI.dictationRealtimeWarmup({
         ...opts,
@@ -347,7 +367,7 @@ class AudioManager {
     this.streamingCleanupFns = [];
     this.streamingFinalText = "";
     this.streamingPartialText = "";
-    this.streamingTextResolve = null;
+    this.streamingTextBump = null;
     this.streamingTextDebounce = null;
     this.cachedMicDeviceId = null;
     this.validatedSelectedMicDeviceId = null;
@@ -506,6 +526,8 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
   setCallbacks({
     onStateChange,
     onError,
+    // Optional: the agent overlay has no dictation toast surface.
+    onNoAudio = undefined,
     onTranscriptionComplete,
     onPartialTranscript,
     onStreamingCommit,
@@ -513,6 +535,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
   }) {
     this.onStateChange = onStateChange;
     this.onError = onError;
+    this.onNoAudio = onNoAudio;
     this.onTranscriptionComplete = onTranscriptionComplete;
     this.onPartialTranscript = onPartialTranscript;
     this.onStreamingCommit = onStreamingCommit;
@@ -1440,7 +1463,16 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         "performance"
       );
 
-      if (error.message !== "No audio detected") {
+      if (error.code === DICTIONARY_ECHO_CODE) {
+        // The transcript was discarded as an echo of the dictionary prompt. Only
+        // the local engine's genuine-silence path gets a toast from main, so
+        // surface the same one here and keep the audio for a manual retry —
+        // otherwise the whole utterance disappears with no feedback (#1547).
+        this.onNoAudio?.();
+        if (this.lastAudioBlob) {
+          this.saveFailedTranscription(error.message, error.code, metadata);
+        }
+      } else if (error.message !== "No audio detected") {
         this.onError?.({
           title: error.selectionEditFatal ? "Selection Edit Failed" : "Transcription Error",
           description: error.selectionEditFatal
@@ -1518,7 +1550,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
             skipVad: true,
           });
           if (!retry?.success || !retry.text?.trim() || this.isDictionaryEcho(retry.text)) {
-            throw new Error("No audio detected");
+            throw dictionaryEchoError();
           }
           logger.info(
             "Recovered transcript after dictionary-echo detection",
@@ -2443,7 +2475,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
     const rawText = result.text;
     if (this.isDictionaryEcho(rawText)) {
-      throw new Error("No audio detected");
+      throw dictionaryEchoError();
     }
     let processedText = result.text;
     if (processedText && !this.skipReasoning) {
@@ -2454,7 +2486,9 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         settings,
         agentName,
         this.voiceAgentRequested,
-        this.translationRequested
+        this.translationRequested,
+        undefined,
+        result.sttLanguage
       );
       if (this.translationRequested && route.kind !== "translation") {
         this.notifyTranslationFallback("unreachable");
@@ -2632,7 +2666,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           throw new Error("No text transcribed - Tinfoil response was empty");
         }
         if (this.isDictionaryEcho(proxyText)) {
-          throw new Error("No audio detected");
+          throw dictionaryEchoError();
         }
         timings.transcriptionProcessingDurationMs = Math.round(performance.now() - apiCallStart);
         const reasoningStart = performance.now();
@@ -2737,7 +2771,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
         if (proxyText && proxyText.trim().length > 0) {
           if (this.isDictionaryEcho(proxyText)) {
-            throw new Error("No audio detected");
+            throw dictionaryEchoError();
           }
           timings.transcriptionProcessingDurationMs = Math.round(performance.now() - apiCallStart);
           const rawText = proxyText;
@@ -2770,7 +2804,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
         if (proxyText && proxyText.trim().length > 0) {
           if (this.isDictionaryEcho(proxyText)) {
-            throw new Error("No audio detected");
+            throw dictionaryEchoError();
           }
           timings.transcriptionProcessingDurationMs = Math.round(performance.now() - apiCallStart);
           const rawText = proxyText;
@@ -2801,7 +2835,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
         if (proxyText && proxyText.trim().length > 0) {
           if (this.isDictionaryEcho(proxyText)) {
-            throw new Error("No audio detected");
+            throw dictionaryEchoError();
           }
           timings.transcriptionProcessingDurationMs = Math.round(performance.now() - apiCallStart);
           const rawText = proxyText;
@@ -2951,7 +2985,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       // Check for text - handle both empty string and missing field
       if (result.text && result.text.trim().length > 0) {
         if (this.isDictionaryEcho(result.text)) {
-          throw new Error("No audio detected");
+          throw dictionaryEchoError();
         }
         timings.transcriptionProcessingDurationMs = Math.round(performance.now() - apiCallStart);
         const rawText = result.text;
@@ -3756,11 +3790,12 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       //    events are lost during the connect handshake.
       this.streamingFinalText = "";
       this.streamingPartialText = "";
-      this.streamingTextResolve = null;
+      this.streamingTextBump = null;
       this.streamingTextDebounce = null;
 
       const partialCleanup = provider.onPartial((text) => {
         this.streamingPartialText = text;
+        this.streamingTextBump?.();
         this.onPartialTranscript?.(text);
       });
 
@@ -3770,6 +3805,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         const prevLen = this.streamingFinalText.length;
         this.streamingFinalText = text;
         this.streamingPartialText = "";
+        this.streamingTextBump?.();
         const newSegment = text.slice(prevLen);
         if (newSegment) {
           this.onStreamingCommit?.(newSegment);
@@ -3945,6 +3981,29 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     }
   }
 
+  // Resolves once the transcript stops moving. An outstanding partial proves its
+  // final is still in flight, so only the ceiling ends the wait until it lands —
+  // a plain debounce would expire on the very tail this exists to catch.
+  awaitStreamingTextSettled() {
+    return new Promise((resolve) => {
+      const settle = () => {
+        clearTimeout(this.streamingTextDebounce);
+        clearTimeout(ceiling);
+        this.streamingTextBump = null;
+        this.streamingTextDebounce = null;
+        resolve();
+      };
+      const ceiling = setTimeout(settle, STREAMING_FINAL_CEILING_MS);
+      const arm = () => {
+        clearTimeout(this.streamingTextDebounce);
+        if (this.streamingPartialText) return;
+        this.streamingTextDebounce = setTimeout(settle, STREAMING_FINAL_QUIET_MS);
+      };
+      this.streamingTextBump = arm;
+      arm();
+    });
+  }
+
   async stopStreamingRecording() {
     if (this.streamingStartInProgress) {
       this.stopRequestedDuringStreamingStart = true;
@@ -4021,12 +4080,17 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     //    Then mark streaming done so no further audio is forwarded.
     await new Promise((resolve) => setTimeout(resolve, 120));
     this.isStreaming = false;
+    const tFlush = performance.now();
 
     // 4. Finalize tells the provider to process any buffered audio and send final results.
-    //    Wait briefly so the server sends back the finalized transcript before disconnect.
+    //    Wait for the transcript to settle before disconnecting.
     const provider = this.getStreamingProvider();
     provider.finalize?.();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (provider.awaitsFinalTranscript) {
+      await this.awaitStreamingTextSettled();
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
     const tForceEndpoint = performance.now();
 
     const stopResult = await provider.stop().catch((e) => {
@@ -4059,6 +4123,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         durationSeconds,
         audioCleanupMs: Math.round(tAudioCleanup - t0),
         flushWaitMs: Math.round(tForceEndpoint - tAudioCleanup),
+        finalSettleMs: Math.round(tForceEndpoint - tFlush),
         terminateRoundTripMs: Math.round(tTerminate - tForceEndpoint),
         totalStopMs: Math.round(tTerminate - t0),
         textLength: finalText.length,
@@ -4435,7 +4500,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     this.streamingCleanupFns = [];
     this.streamingFinalText = "";
     this.streamingPartialText = "";
-    this.streamingTextResolve = null;
+    this.streamingTextBump = null;
     clearTimeout(this.streamingTextDebounce);
     this.streamingTextDebounce = null;
   }

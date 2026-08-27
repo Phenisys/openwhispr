@@ -395,3 +395,113 @@ test("blank stored provider resolves to undefined outside local mode", async () 
     undefined
   );
 });
+
+test("translation provider: cloud mode always routes to openwhispr", async () => {
+  const { resolveTranslationProviderId } = await load();
+
+  assert.equal(
+    resolveTranslationProviderId({
+      isCloudTranslation: true,
+      translationMode: "local",
+      translationProvider: "llama",
+    }),
+    "openwhispr"
+  );
+});
+
+test("translation provider: an explicit provider passes through trimmed", async () => {
+  const { resolveTranslationProviderId } = await load();
+
+  assert.equal(
+    resolveTranslationProviderId({
+      isCloudTranslation: false,
+      translationMode: "providers",
+      translationProvider: " groq ",
+    }),
+    "groq"
+  );
+
+  const { resolveTranslationProviderId: resolve } = await load();
+  assert.equal(
+    resolve({
+      isCloudTranslation: false,
+      translationMode: "local",
+      translationProvider: "qwen",
+    }),
+    "qwen"
+  );
+});
+
+test("translation provider: empty provider in local mode routes to llama.cpp", async () => {
+  const { resolveTranslationProviderId } = await load();
+
+  // Picking a local model without ever clicking a provider tab leaves the
+  // stored provider empty; local mode must still resolve locally.
+  assert.equal(
+    resolveTranslationProviderId({
+      isCloudTranslation: false,
+      translationMode: "local",
+      translationProvider: "",
+    }),
+    "local"
+  );
+});
+
+test("translation provider: empty provider outside local mode stays undefined", async () => {
+  const { resolveTranslationProviderId } = await load();
+
+  assert.equal(
+    resolveTranslationProviderId({
+      isCloudTranslation: false,
+      translationMode: "providers",
+      translationProvider: "  ",
+    }),
+    undefined
+  );
+
+  const { resolveTranslationProviderId: resolve } = await load();
+  assert.equal(
+    resolve({
+      isCloudTranslation: false,
+      translationMode: "self-hosted",
+      translationProvider: "",
+    }),
+    undefined
+  );
+});
+
+test("wake-word language follows the dictation language when it is explicit", async () => {
+  const { resolveWakeWordLanguage } = await load();
+
+  assert.equal(
+    resolveWakeWordLanguage({ preferredLanguage: "it", uiLanguage: "en" }, "fr"),
+    "it"
+  );
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: "zh-CN", uiLanguage: "en" }), "zh-CN");
+});
+
+test("wake-word language uses detected speech before the UI language on auto", async () => {
+  const { resolveWakeWordLanguage } = await load();
+
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: "auto", uiLanguage: "it" }, "en"), "en");
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: "", uiLanguage: "en" }, "it"), "it");
+});
+
+test("wake-word language falls back to the UI language on auto or unset", async () => {
+  const { resolveWakeWordLanguage } = await load();
+
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: "auto", uiLanguage: "it" }), "it");
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: "", uiLanguage: "pt" }), "pt");
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: "  ", uiLanguage: "de" }), "de");
+  assert.equal(resolveWakeWordLanguage({ preferredLanguage: undefined, uiLanguage: "fr" }), "fr");
+});
+
+test("wake-word language is undefined when no usable hint exists", async () => {
+  const { resolveWakeWordLanguage } = await load();
+
+  assert.equal(
+    resolveWakeWordLanguage({ preferredLanguage: "auto", uiLanguage: undefined }),
+    undefined
+  );
+  assert.equal(resolveWakeWordLanguage({}), undefined);
+});
