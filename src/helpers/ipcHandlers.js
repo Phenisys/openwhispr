@@ -3126,6 +3126,7 @@ class IPCHandlers {
 
         // On GNOME, unregister all native keybindings during capture
         if (hotkeyManager.isUsingGnome() && hotkeyManager.gnomeManager) {
+          await hotkeyManager.gnomeManager.unregisterPushToTalk();
           for (const slot of [...hotkeyManager.gnomeManager.registeredSlots]) {
             debugLogger.log(
               `[IPC] Unregistering GNOME keybinding (slot "${slot}") for capture mode`
@@ -3178,11 +3179,13 @@ class IPCHandlers {
 
         // On GNOME, re-register the keybinding with the effective hotkey
         if (hotkeyManager.isUsingGnome() && hotkeyManager.gnomeManager && effectiveHotkey) {
-          const gnomeHotkey = GnomeShortcutManager.convertToGnomeFormat(effectiveHotkey);
           debugLogger.log(
-            `[IPC] Re-registering GNOME keybinding "${gnomeHotkey}" after capture mode`
+            `[IPC] Re-registering GNOME keybinding "${effectiveHotkey}" after capture mode`
           );
-          await hotkeyManager.gnomeManager.registerKeybinding(gnomeHotkey);
+          await hotkeyManager.registerGnomeDictationHotkey(
+            effectiveHotkey,
+            this.windowManager.createHotkeyCallback()
+          );
         }
 
         // On Hyprland Wayland, re-register the keybinding with the effective hotkey
@@ -3190,7 +3193,10 @@ class IPCHandlers {
           debugLogger.log(
             `[IPC] Re-registering Hyprland keybinding "${effectiveHotkey}" after capture mode`
           );
-          await hotkeyManager.hyprlandManager.registerKeybinding(effectiveHotkey);
+          await hotkeyManager.hyprlandManager.registerKeybinding(
+            effectiveHotkey,
+            this.windowManager.getActivationMode() === "push"
+          );
         }
 
         // On KDE (X11 or Wayland), re-register the keybinding with the effective hotkey
@@ -3202,7 +3208,8 @@ class IPCHandlers {
           const result = await hotkeyManager.kdeManager.registerKeybinding(
             effectiveHotkey,
             "dictation",
-            callback
+            callback,
+            this.windowManager.getActivationMode() === "push"
           );
           if (result !== true) {
             debugLogger.warn(
@@ -3229,11 +3236,18 @@ class IPCHandlers {
       return { success: true };
     });
 
-    ipcMain.handle("get-hotkey-mode-info", async () => {
+    ipcMain.handle("get-hotkey-mode-info", async (_event, requestedHotkey) => {
+      const hotkeyManager = this.windowManager.hotkeyManager;
+      const hotkey =
+        typeof requestedHotkey === "string" && requestedHotkey.trim()
+          ? requestedHotkey.split(",")[0].trim()
+          : hotkeyManager.getCurrentHotkey();
       const isUsingNativeShortcut = this.windowManager.isUsingNativeShortcutHotkeys();
       const supportsPushToTalk =
         process.platform === "linux"
-          ? this.linuxKeyManager?.isAvailable?.() === true
+          ? isUsingNativeShortcut
+            ? hotkeyManager.supportsPushToTalk(hotkey)
+            : this.linuxKeyManager?.isAvailable?.() === true
           : !isUsingNativeShortcut;
 
       return {
@@ -3242,6 +3256,9 @@ class IPCHandlers {
         isUsingKDE: this.windowManager.isUsingKDEHotkeys(),
         isUsingNativeShortcut,
         supportsPushToTalk,
+        pushToTalkUnavailableReason: supportsPushToTalk
+          ? null
+          : hotkeyManager.getPushToTalkUnavailableReason(hotkey),
       };
     });
 

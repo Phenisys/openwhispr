@@ -1,5 +1,6 @@
 const { execFileSync } = require("child_process");
 const debugLogger = require("./debugLogger");
+const GnomeGlobalShortcutsPortal = require("./gnomeGlobalShortcutsPortal");
 
 const DBUS_SERVICE_NAME = "com.openwhispr.App";
 const DBUS_OBJECT_PATH = "/com/openwhispr/App";
@@ -30,11 +31,20 @@ const SLOT_CONFIG = {
 };
 
 const KEYBINDING_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding";
+const PORTAL_MODIFIER_NAMES = new Set([
+  "commandorcontrol",
+  "control",
+  "ctrl",
+  "alt",
+  "shift",
+  "super",
+  "meta",
+]);
 
 // Valid pattern for GNOME shortcut format using X11 keysym names (case-sensitive).
 // Modifiers are case-insensitive (GTK normalizes them), keysyms are exact.
 const VALID_SHORTCUT_PATTERN =
-  /^(<(Control|Alt|Shift|Super)>)*(F([1-9]|1[0-9]|2[0-4])|[a-z0-9]|space|Escape|Tab|BackSpace|grave|Pause|Scroll_Lock|Insert|Delete|Home|End|Page_Up|Page_Down|Up|Down|Left|Right|Return|Print)$/;
+  /^(<(Control|Alt|Shift|Super)>)*(F([1-9]|1[0-9]|2[0-4])|comma|period|slash|plus|minus|equal|semicolon|apostrophe|backslash|bracketleft|bracketright|asciitilde|exclam|at|numbersign|dollar|percent|asciicircum|ampersand|asterisk|parenleft|parenright|underscore|braceleft|braceright|bar|colon|quotedbl|less|greater|question|[a-z0-9]|space|Escape|Tab|BackSpace|grave|Pause|Scroll_Lock|Insert|Delete|Home|End|Page_Up|Page_Down|Up|Down|Left|Right|Return|Print)$/;
 
 // Map Electron key names (lowercased) to X11 keysym names (case-sensitive).
 // Source: X11/keysymdef.h, lookup via XStringToKeysym(3).
@@ -63,6 +73,45 @@ const ELECTRON_TO_GNOME_KEY_MAP = {
   down: "Down",
   left: "Left",
   right: "Right",
+  // Punctuation must be X11 keysyms; a literal "," fails VALID_SHORTCUT_PATTERN.
+  ",": "comma",
+  ".": "period",
+  "/": "slash",
+  "-": "minus",
+  "=": "equal",
+  ";": "semicolon",
+  "'": "apostrophe",
+  "[": "bracketleft",
+  "]": "bracketright",
+  "\\": "backslash",
+  plus: "plus",
+  "+": "plus",
+};
+
+// HotkeyInput stores physical US-QWERTY keys, so Shift must be folded into
+// the keysym GNOME matches rather than retained as a separate modifier.
+const SHIFTED_PUNCTUATION_TO_GNOME_KEY_MAP = {
+  "`": "asciitilde",
+  1: "exclam",
+  2: "at",
+  3: "numbersign",
+  4: "dollar",
+  5: "percent",
+  6: "asciicircum",
+  7: "ampersand",
+  8: "asterisk",
+  9: "parenleft",
+  0: "parenright",
+  "-": "underscore",
+  "=": "plus",
+  "[": "braceleft",
+  "]": "braceright",
+  "\\": "bar",
+  ";": "colon",
+  "'": "quotedbl",
+  ",": "less",
+  ".": "greater",
+  "/": "question",
 };
 
 let dbus = null;
@@ -94,6 +143,7 @@ class GnomeShortcutManager {
     this.meetingCallback = null;
     this.voiceAgentCallback = null;
     this.translationCallback = null;
+    this.globalShortcutsPortal = new GnomeGlobalShortcutsPortal();
     // Track which slots have been registered in gsettings
     this.registeredSlots = new Set();
   }
@@ -206,6 +256,34 @@ class GnomeShortcutManager {
     }
   }
 
+  async initGlobalShortcutsPortal() {
+    return this.globalShortcutsPortal.init();
+  }
+
+  supportsPushToTalk() {
+    return this.globalShortcutsPortal.isAvailable();
+  }
+
+  async registerPushToTalk(hotkey, callback) {
+    const preferredTrigger = GnomeShortcutManager.convertToPortalFormat(hotkey);
+    if (!preferredTrigger) return false;
+
+    await this.unregisterKeybinding("dictation");
+    const registered = await this.globalShortcutsPortal.registerKeybinding(
+      preferredTrigger,
+      callback
+    );
+    if (!registered) {
+      const tapShortcut = GnomeShortcutManager.convertToGnomeFormat(hotkey);
+      await this.registerKeybinding(tapShortcut, "dictation");
+    }
+    return registered;
+  }
+
+  async unregisterPushToTalk() {
+    await this.globalShortcutsPortal.unregisterKeybinding();
+  }
+
   static isValidShortcut(shortcut) {
     if (!shortcut || typeof shortcut !== "string") {
       return false;
@@ -299,46 +377,6 @@ class GnomeShortcutManager {
     } catch (err) {
       debugLogger.log(
         `[GnomeShortcut] Failed to register keybinding for slot "${slotName}":`,
-        err.message
-      );
-      return false;
-    }
-  }
-
-  async updateKeybinding(shortcut, slotName = "dictation") {
-    if (!this.registeredSlots.has(slotName)) {
-      return this.registerKeybinding(shortcut, slotName);
-    }
-
-    if (!GnomeShortcutManager.isValidShortcut(shortcut)) {
-      debugLogger.log(
-        `[GnomeShortcut] Invalid shortcut format for update: "${shortcut}" (slot "${slotName}")`
-      );
-      return false;
-    }
-
-    const { path: keybindingPath } = getSlotConfig(slotName);
-
-    try {
-      const existing = this.getExistingKeybindings();
-      const conflict = this.findConflictingBinding(shortcut, existing, keybindingPath);
-      if (conflict) {
-        debugLogger.log(
-          `[GnomeShortcut] Shortcut conflict on update — "${shortcut}" already used by "${conflict}"`
-        );
-        return false;
-      }
-
-      execFileSync(
-        "gsettings",
-        ["set", `${KEYBINDING_SCHEMA}:${keybindingPath}`, "binding", shortcut],
-        { stdio: "pipe" }
-      );
-      debugLogger.log(`[GnomeShortcut] Keybinding updated to "${shortcut}" for slot "${slotName}"`);
-      return true;
-    } catch (err) {
-      debugLogger.log(
-        `[GnomeShortcut] Failed to update keybinding for slot "${slotName}":`,
         err.message
       );
       return false;
@@ -462,11 +500,16 @@ class GnomeShortcutManager {
     }
 
     const key = parts.pop();
+    const keyLower = key.toLowerCase();
+    const shiftedPunctuationKey = parts.some((mod) => mod.toLowerCase() === "shift")
+      ? SHIFTED_PUNCTUATION_TO_GNOME_KEY_MAP[keyLower]
+      : undefined;
     const modifiers = parts
       .map((mod) => {
         const m = mod.toLowerCase();
         if (m === "commandorcontrol" || m === "control" || m === "ctrl") return "<Control>";
         if (m === "alt") return "<Alt>";
+        if (m === "shift" && shiftedPunctuationKey) return "";
         if (m === "shift") return "<Shift>";
         if (m === "super" || m === "meta") return "<Super>";
         return "";
@@ -474,10 +517,10 @@ class GnomeShortcutManager {
       .filter(Boolean)
       .join("");
 
-    const keyLower = key.toLowerCase();
-
     let gnomeKey;
-    if (key === "`" || keyLower === "backquote") {
+    if (shiftedPunctuationKey) {
+      gnomeKey = shiftedPunctuationKey;
+    } else if (key === "`" || keyLower === "backquote") {
       gnomeKey = "grave";
     } else if (key === " ") {
       gnomeKey = "space";
@@ -492,7 +535,51 @@ class GnomeShortcutManager {
     return modifiers + gnomeKey;
   }
 
-  close() {
+  static convertToPortalFormat(hotkey) {
+    if (!hotkey || typeof hotkey !== "string") return "";
+
+    const parts = hotkey
+      .split("+")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (
+      parts.length === 0 ||
+      parts.every((part) => PORTAL_MODIFIER_NAMES.has(part.toLowerCase()))
+    ) {
+      return "";
+    }
+
+    const key = parts.pop();
+    const keyLower = key.toLowerCase();
+    const modifiers = parts
+      .map((modifier) => {
+        const name = modifier.toLowerCase();
+        if (name === "commandorcontrol" || name === "control" || name === "ctrl") return "CTRL";
+        if (name === "alt") return "ALT";
+        if (name === "shift") return "SHIFT";
+        if (name === "super" || name === "meta") return "LOGO";
+        return "";
+      })
+      .filter(Boolean);
+
+    let portalKey;
+    if (key === "`" || keyLower === "backquote") {
+      portalKey = "grave";
+    } else if (key === " ") {
+      portalKey = "space";
+    } else if (ELECTRON_TO_GNOME_KEY_MAP[keyLower]) {
+      portalKey = ELECTRON_TO_GNOME_KEY_MAP[keyLower];
+    } else if (/^F\d+$/i.test(key)) {
+      portalKey = key.toUpperCase();
+    } else {
+      portalKey = keyLower;
+    }
+
+    return [...modifiers, portalKey].join("+");
+  }
+
+  async close() {
+    await this.globalShortcutsPortal.close();
     if (this.bus) {
       this.bus.connection.end();
       this.bus = null;

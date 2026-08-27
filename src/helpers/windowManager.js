@@ -49,6 +49,8 @@ class WindowManager {
     this._isDictatingToggle = false;
     this._pendingMeetingNoteNavigation = null;
     this._pendingNoteNavigation = null;
+    this._onboardingActive = false;
+    this._deferredUpdateNotificationInfo = null;
 
     app.on("before-quit", () => {
       this.isQuitting = true;
@@ -220,15 +222,25 @@ class WindowManager {
     let lastToggleTime = 0;
     const DEBOUNCE_MS = 150;
 
-    // globalShortcut registrations pass the hotkey that fired; native-shortcut
-    // backends invoke the callback bare (their slot holds only the primary).
-    return async (triggeredHotkey) => {
+    // globalShortcut registrations pass the hotkey that fired; native shortcuts
+    // use down/up phases and resolve their primary hotkey from the active slot.
+    return async (triggeredHotkey, phase) => {
       if (this.hotkeyManager.isInListeningMode()) {
         return;
       }
 
       const activationMode = this.getActivationMode();
       const currentHotkey = triggeredHotkey || this.hotkeyManager.getCurrentHotkey?.();
+
+      if (process.platform === "linux" && activationMode === "push") {
+        if (phase === "down") {
+          this.startWindowsPushToTalk(currentHotkey);
+        } else if (phase === "up") {
+          this.handleWindowsPushKeyUp(currentHotkey);
+        }
+        return;
+      }
+      if (phase === "up") return;
 
       if (
         process.platform === "darwin" &&
@@ -399,15 +411,23 @@ class WindowManager {
     }
 
     const MIN_HOLD_DURATION_MS = 150;
+    const MAX_PUSH_DURATION_MS = 300000;
     const downTime = Date.now();
 
     this.showDictationPanel();
+
+    const safetyTimeoutId = setTimeout(() => {
+      if (!this.winPushState || this.winPushState.downTime !== downTime) return;
+      debugLogger.warn("Native PTT safety timeout", undefined, "ptt");
+      this.handleWindowsPushKeyUp();
+    }, MAX_PUSH_DURATION_MS);
 
     this.winPushState = {
       active: true,
       key,
       downTime,
       isRecording: false,
+      safetyTimeoutId,
     };
 
     setTimeout(() => {
@@ -430,6 +450,10 @@ class WindowManager {
     }
     if (key && this.winPushState.key && key !== this.winPushState.key) {
       return;
+    }
+
+    if (this.winPushState.safetyTimeoutId) {
+      clearTimeout(this.winPushState.safetyTimeoutId);
     }
 
     const wasRecording = this.winPushState.isRecording;
@@ -526,8 +550,12 @@ class WindowManager {
     return this._cachedActivationMode;
   }
 
-  setActivationModeCache(mode) {
-    this._cachedActivationMode = mode === "push" ? "push" : "tap";
+  async setActivationModeCache(mode) {
+    const nextMode = mode === "push" ? "push" : "tap";
+    const success = await this.hotkeyManager.setActivationMode(nextMode);
+    if (!success) return false;
+    this._cachedActivationMode = nextMode;
+    return true;
   }
 
   /**
@@ -1295,6 +1323,47 @@ class WindowManager {
 
   dismissMeetingAutoEndCountdown(sessionId) {
     this.dismissMeetingNotification();
+  }
+
+  setOnboardingActive(active) {
+    const nextActive = active === true;
+    if (nextActive === this._onboardingActive) {
+      if (nextActive) this._hideNormalAppSurfaces();
+      return true;
+    }
+
+    if (nextActive) {
+      this._onboardingActive = true;
+      this.sendCancelDictation();
+      this._hideNormalAppSurfaces();
+      return true;
+    }
+
+    this.endOnboardingDemo();
+    this.sendCancelDictation();
+    this.hideDictationPanel();
+    this._onboardingActive = false;
+    if (!this._floatingIconAutoHide) this.showDictationPanel();
+    const deferredUpdate = this._deferredUpdateNotificationInfo;
+    this._deferredUpdateNotificationInfo = null;
+    if (deferredUpdate) void this.showUpdateNotification(deferredUpdate);
+    return true;
+  }
+
+  _hideNormalAppSurfaces() {
+    this.hideDictationPanel();
+    this.hideTranscriptionPreview();
+    this.dismissMeetingNotification();
+
+    if (this._pendingUpdateNotificationData) {
+      this._deferredUpdateNotificationInfo = { ...this._pendingUpdateNotificationData };
+    }
+    this.dismissUpdateNotification({ persistent: false });
+  }
+
+  endOnboardingDemo() {
+    // No-op: the fork's onboarding flow manages its demo lifecycle in the
+    // renderer. Kept as a seam for setOnboardingActive parity with upstream.
   }
 
   async showUpdateNotification(info) {
