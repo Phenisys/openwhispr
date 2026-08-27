@@ -431,14 +431,14 @@ export default function TranscriptionModelPicker({
     const current = selectedLocalModelRef.current;
     if (!current) return;
 
-    const downloaded = loadedModels.filter((m) => m.downloaded);
-    const isCurrentDownloaded = loadedModels.find((m) => m.model === current)?.downloaded;
+    // The whisper list loads on a mere browse of the Whisper tab, so the
+    // committed selection can be a foreign id (a Parakeet model while nvidia
+    // is committed) — only replace ids this list owns.
+    const currentEntry = loadedModels.find((m) => m.model === current);
+    if (!currentEntry || currentEntry.downloaded) return;
 
-    if (!isCurrentDownloaded && downloaded.length > 0) {
-      onLocalModelSelectRef.current(downloaded[0].model);
-    } else if (!isCurrentDownloaded && downloaded.length === 0) {
-      onLocalModelSelectRef.current("");
-    }
+    const downloaded = loadedModels.filter((m) => m.downloaded);
+    onLocalModelSelectRef.current(downloaded[0]?.model ?? "", "whisper");
   }, []);
 
   const loadLocalModels = useCallback(() => {
