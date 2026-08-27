@@ -11,6 +11,7 @@ import UpcomingMeetings from "./UpcomingMeetings";
 import { useSettingsStore } from "../stores/settingsStore";
 import { effectiveLocalHistoryEnabled } from "../stores/policyRules";
 import { usePolicyStore } from "../stores/policyStore";
+import { cn } from "./lib/utils";
 
 interface HistoryViewProps {
   history: TranscriptionItemType[];
