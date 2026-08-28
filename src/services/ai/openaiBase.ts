@@ -85,4 +85,3 @@ export function getConfiguredOpenAIBase(): string {
   const settings = getSettings();
   return resolveConfiguredOpenAIBase(settings.cleanupProvider || "", settings.cleanupCloudBaseUrl);
 }
-

@@ -276,10 +276,7 @@ function migrateProviderSettings() {
       reasoningProvider === "vertex"
     ) {
       newReasoningMode = "enterprise";
-    } else if (
-      reasoningProvider &&
-      localLlmProviderIds.has(reasoningProvider)
-    ) {
+    } else if (reasoningProvider && localLlmProviderIds.has(reasoningProvider)) {
       newReasoningMode = "local";
     } else {
       newReasoningMode = "providers";
