@@ -12,6 +12,7 @@ const { getSafeTempDir } = require("./safeTempDir");
 const { convertToWav } = require("./ffmpegUtils");
 const sidecarPidFile = require("./sidecarPidFile");
 const { sanitizeWhisperVadConfig, DEFAULT_WHISPER_VAD_CONFIG } = require("./whisperVadConfig");
+const { createAbortError } = require("./abortError");
 const {
   computeTranscriptionTimeoutMs,
   PCM16_MONO_16K_BYTES_PER_SECOND,
@@ -740,7 +741,8 @@ class WhisperServerManager extends EventEmitter {
           : "too short",
     });
 
-    const { language, initialPrompt } = options;
+    const { language, initialPrompt, signal } = options;
+    if (signal?.aborted) throw createAbortError("whisper-server transcription cancelled");
 
     // Always convert to 16kHz mono WAV - whisper.cpp requires this exact format
     let finalBuffer = audioBuffer;
@@ -800,18 +802,26 @@ class WhisperServerManager extends EventEmitter {
     const modelPath = this.modelPath;
 
     try {
-      return await this._postInference(body, boundary);
+      return await this._postInference(body, boundary, signal);
     } catch (err) {
+      // A cancel is not a server failure: rethrow before the retry/CPU-fallback
+      // logic so it never triggers a server restart.
+      if (err?.name === "AbortError") throw err;
       return await this._retryAfterRequestFailure(err, body, boundary, generation, modelPath);
     }
   }
 
-  _postInference(body, boundary) {
+  _postInference(body, boundary, signal) {
     // Multipart boilerplate adds under a kilobyte, so body length tracks audio length.
     const timeoutMs = computeTranscriptionTimeoutMs(body.length / PCM16_MONO_16K_BYTES_PER_SECOND);
 
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
+
+      if (signal?.aborted) {
+        reject(createAbortError("whisper-server request cancelled"));
+        return;
+      }
 
       const req = http.request(
         {
@@ -831,6 +841,7 @@ class WhisperServerManager extends EventEmitter {
             data += chunk;
           });
           res.on("end", () => {
+            removeAbortListener();
             debugLogger.debug("whisper-server transcription completed", {
               statusCode: res.statusCode,
               elapsed: Date.now() - startTime,
@@ -852,7 +863,18 @@ class WhisperServerManager extends EventEmitter {
         }
       );
 
+      // whisper-server has no mid-inference cancellation: destroying the
+      // request frees this pipeline immediately, but the server finishes its
+      // in-flight decode on its own.
+      const onAbort = () => {
+        req.destroy();
+        reject(createAbortError("whisper-server request cancelled"));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      const removeAbortListener = () => signal?.removeEventListener("abort", onAbort);
+
       req.on("error", (error) => {
+        removeAbortListener();
         const err = new Error(`whisper-server request failed: ${error.message}`);
         err.isConnectionError = true;
         err.code = error.code;
@@ -909,6 +931,8 @@ class WhisperServerManager extends EventEmitter {
       throw err;
     }
     try {
+      // No signal here: this retry runs against a server another start already
+      // replaced; the outer transcribe() still rethrows an abort of this flow.
       return await this._postInference(body, boundary);
     } catch (retryErr) {
       // The replacement can be another doomed GPU server (a peer restarted with the

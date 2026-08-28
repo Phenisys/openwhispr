@@ -35,18 +35,28 @@ function wavFromSeconds(spans) {
   return buf;
 }
 
-function fakeWsServer(responses) {
+function fakeWsServer(responses, { onCall } = {}) {
   const calls = [];
   return {
     calls,
     async start() {},
-    async transcribe(samplesBuffer) {
+    async transcribe(samplesBuffer, sampleRate, { signal } = {}) {
       calls.push(samplesBuffer.length);
+      if (signal?.aborted) {
+        const { createAbortError } = require("../../src/helpers/abortError");
+        throw createAbortError("fake ws transcription cancelled");
+      }
       const next = responses.shift();
       assert.ok(next, "unexpected extra transcribe call");
+      onCall?.(calls.length);
       return { elapsed: 1, ...next };
     },
   };
+}
+
+function isAbortError(err) {
+  assert.equal(err.name, "AbortError");
+  return true;
 }
 
 function managerWith(fake) {
@@ -122,5 +132,59 @@ test("a silent segment decoding to empty is not retried or flagged", async () =>
 
   assert.equal(result.text, "alpha omega");
   assert.ok(!result.truncated, "silence is not data loss");
+  assert.equal(fake.calls.length, 3);
+});
+
+test("a pre-aborted signal rejects before any decode is issued", async () => {
+  const fake = fakeWsServer([]);
+  const manager = managerWith(fake);
+  const controller = new AbortController();
+  controller.abort();
+
+  await assert.rejects(
+    () => manager.transcribe(wavFromSeconds([{ seconds: 10 }]), { signal: controller.signal }),
+    isAbortError
+  );
+  assert.equal(fake.calls.length, 0);
+});
+
+test("an abort during the first segment stops the segment loop", async () => {
+  const controller = new AbortController();
+  const fake = fakeWsServer([{ text: "one" }, { text: "two" }, { text: "three" }], {
+    onCall: () => controller.abort(),
+  });
+  const manager = managerWith(fake);
+
+  await assert.rejects(
+    () => manager.transcribe(wavFromSeconds([{ seconds: 31 }]), { signal: controller.signal }),
+    isAbortError
+  );
+  assert.ok(fake.calls.length < 3, "the segment loop must stop scheduling after an abort");
+});
+
+test("an abort during an empty-decode retry is not retried", async () => {
+  const controller = new AbortController();
+  const fake = fakeWsServer([{ text: "" }, { text: "two" }, { text: "three" }], {
+    onCall: (n) => {
+      // First call is the audible empty decode; the second (retry) aborts.
+      if (n === 1) controller.abort();
+    },
+  });
+  const manager = managerWith(fake);
+
+  await assert.rejects(
+    () => manager.transcribe(wavFromSeconds([{ seconds: 31 }]), { signal: controller.signal }),
+    isAbortError
+  );
+  assert.equal(fake.calls.length, 1, "the empty-decode retry must not run after a cancel");
+});
+
+test("transcribe without a signal is unchanged", async () => {
+  const fake = fakeWsServer([{ text: "one" }, { text: "two" }, { text: "three" }]);
+  const manager = managerWith(fake);
+
+  const result = await manager.transcribe(wavFromSeconds([{ seconds: 31 }]));
+
+  assert.equal(result.text, "one two three");
   assert.equal(fake.calls.length, 3);
 });

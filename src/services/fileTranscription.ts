@@ -49,6 +49,9 @@ export async function transcribeFile(
     return window.electronAPI.transcribeAudioFile(filePath, {
       provider: cfg.localTranscriptionProvider as "whisper" | "nvidia",
       model: cfg.localTranscriptionProvider === "nvidia" ? cfg.parakeetModel : cfg.whisperModel,
+      // Lets cancel-upload-transcription abort the local decode too; the
+      // batch queue's cloud abort pattern is extended to local providers.
+      requestId: opts.requestId,
     });
   }
 
@@ -123,6 +126,8 @@ export async function transcribeFileWithSpeakers(
       ? (window.electronAPI
           .diarizeAudioFile?.(filePath, {
             numSpeakers: diarization.numSpeakers ?? undefined,
+            // Same requestId as the transcription: one cancel aborts both.
+            requestId: opts.requestId,
           })
           .catch(() => null) ?? Promise.resolve(null))
       : Promise.resolve(null);

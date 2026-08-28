@@ -284,7 +284,7 @@ class DiarizationManager {
   }
 
   async diarize(wavPath, options = {}) {
-    const { numSpeakers = -1, threshold = 0.55 } = options;
+    const { numSpeakers = -1, threshold = 0.55, signal } = options;
 
     const binaryPath = this.getBinaryPath();
     if (!binaryPath) {
@@ -299,6 +299,11 @@ class DiarizationManager {
 
     if (!fs.existsSync(wavPath)) {
       debugLogger.warn("Diarization input file not found", { wavPath });
+      return [];
+    }
+
+    if (signal?.aborted) {
+      debugLogger.debug("Diarization cancelled before start", {}, "meeting");
       return [];
     }
 
@@ -361,6 +366,15 @@ class DiarizationManager {
         resolve([]);
       }, timeoutMs);
 
+      // A cancel aborts the same way the timeout path does: stop the child
+      // process so the decode doesn't keep running after the upload is gone.
+      const onAbort = () => {
+        clearTimeout(timeout);
+        gracefulStopProcess(proc);
+        resolve([]);
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+
       proc.stdout.on("data", (data) => {
         stdout += data.toString();
       });
@@ -371,6 +385,7 @@ class DiarizationManager {
 
       proc.on("close", (code) => {
         clearTimeout(timeout);
+        signal?.removeEventListener("abort", onAbort);
         untrack();
 
         if (code !== 0) {
@@ -389,6 +404,7 @@ class DiarizationManager {
 
       proc.on("error", (err) => {
         clearTimeout(timeout);
+        signal?.removeEventListener("abort", onAbort);
         untrack();
         debugLogger.warn("Diarization process error", { error: err.message });
         resolve([]);

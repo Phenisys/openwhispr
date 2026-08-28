@@ -1113,9 +1113,13 @@ declare global {
           provider?: "whisper" | "nvidia";
           model?: string;
           language?: string;
+          // Uploads pass a requestId so cancel-upload-transcription can abort
+          // the local decode; flows without one (dictation, voice drafts)
+          // omit it and are unaffected.
+          requestId?: string;
           [key: string]: unknown;
         }
-      ) => Promise<{ success: boolean; text?: string; error?: string }>;
+      ) => Promise<{ success: boolean; text?: string; error?: string; code?: string }>;
       getPathForFile: (file: File) => string;
 
       // URL audio download
@@ -2163,11 +2167,17 @@ declare global {
       ) => Promise<{ success: boolean; text?: string; error?: string }>;
       diarizeAudioFile?: (
         filePath: string,
-        options?: { numSpeakers?: number; threshold?: number }
+        options?: {
+          numSpeakers?: number;
+          threshold?: number;
+          // Same requestId as the upload transcription: one cancel aborts both.
+          requestId?: string;
+        }
       ) => Promise<{
         success: boolean;
         segments?: Array<{ start: number; end: number; speaker: string }>;
         error?: string;
+        code?: string;
       }>;
       onDiarizationDownloadProgress?: (callback: (data: any) => void) => () => void;
       onMeetingDiarizationComplete?: (
