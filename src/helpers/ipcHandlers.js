@@ -973,8 +973,23 @@ class IPCHandlers {
         set: Object.keys(setVars),
         cleared: clearVars.filter((k) => !process.env[k]),
       });
-      this.environmentManager.saveAllKeysToEnvFile().catch(() => {});
+      // A swallowed .env write failure here left GPU enablement flags silently
+      // out of sync with the packs on disk (#1340) — log which keys were lost.
+      this.environmentManager.saveAllKeysToEnvFile().catch((err) => {
+        debugLogger.error("Failed to persist startup env vars to .env", {
+          set: Object.keys(setVars),
+          cleared: clearVars,
+          error: err.message,
+        });
+      });
     }
+  }
+
+  // The dictation slot reports its own changes from the renderer. Slots
+  // registered through IPC have to announce theirs here so macOS can re-derive
+  // which keys the native Globe listener owns.
+  _notifyHotkeyChanged(hotkey) {
+    ipcMain.emit("hotkey-changed", null, hotkey);
   }
 
   // Mints a Corti access token from stored BYOK credentials. Shared by the
@@ -2511,11 +2526,16 @@ class IPCHandlers {
     });
 
     ipcMain.handle("whisper-server-start", async (event, modelName) => {
+      // A pack on disk implies intent: the user downloaded it, so it engages
+      // unless WHISPER_*_ENABLED is explicitly set to "false" (an opt-out that
+      // survives without deleting the pack). Requiring the flag to be present
+      // stranded downloaded packs on silent CPU whenever the .env line was
+      // lost (#1340).
       const useCuda =
-        process.env.WHISPER_CUDA_ENABLED === "true" && this.whisperCudaManager?.isDownloaded();
+        process.env.WHISPER_CUDA_ENABLED !== "false" && this.whisperCudaManager?.isDownloaded();
       const useVulkan =
         !useCuda &&
-        process.env.WHISPER_VULKAN_ENABLED === "true" &&
+        process.env.WHISPER_VULKAN_ENABLED !== "false" &&
         this.whisperVulkanManager?.isDownloaded();
       return this.whisperManager.startServer(modelName, { useCuda, useVulkan });
     });
@@ -2565,7 +2585,7 @@ class IPCHandlers {
             await this.whisperManager.stopServer();
             if (modelName) {
               await this.whisperManager.startServer(modelName, {
-                useCuda: !!process.env.WHISPER_CUDA_ENABLED,
+                useCuda: process.env.WHISPER_CUDA_ENABLED !== "false",
               });
             }
           }
