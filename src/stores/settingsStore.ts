@@ -39,6 +39,7 @@ import type {
   ChatAgentSettings,
 } from "../hooks/useSettings";
 import type { Snippet } from "../utils/snippets";
+import modelRegistryData from "../models/modelRegistryData.json";
 
 let _ReasoningService: typeof import("../services/ReasoningService").default | null = null;
 
@@ -212,6 +213,12 @@ const clampVadValue = (key: WhisperVadKey, raw: unknown): number => {
 
 const LANGUAGE_MIGRATIONS: Record<string, string> = { zh: "zh-CN" };
 
+// Registry-derived so the next local-provider catalog addition cannot repeat
+// the omission that left liquidai out of the hand-maintained lists (#1714).
+const localLlmProviderIds = new Set(
+  modelRegistryData.localProviders.map((provider) => provider.id)
+);
+
 function migratePreferredLanguage() {
   if (!isBrowser) return;
   const stored = localStorage.getItem("preferredLanguage");
@@ -270,11 +277,8 @@ function migrateProviderSettings() {
     ) {
       newReasoningMode = "enterprise";
     } else if (
-      reasoningProvider === "qwen" ||
-      reasoningProvider === "llama" ||
-      reasoningProvider === "mistral" ||
-      reasoningProvider === "openai-oss" ||
-      reasoningProvider === "gemma"
+      reasoningProvider &&
+      localLlmProviderIds.has(reasoningProvider)
     ) {
       newReasoningMode = "local";
     } else {
@@ -332,7 +336,6 @@ function migrateAgentMode() {
 
   let agentInferenceMode: InferenceMode = "openwhispr";
   if (cloudAgentMode === "byok") {
-    const localProviders = ["qwen", "llama", "mistral", "openai-oss", "gemma"];
     if (agentProvider === "custom") {
       agentInferenceMode = "self-hosted";
     } else if (
@@ -341,7 +344,7 @@ function migrateAgentMode() {
       agentProvider === "vertex"
     ) {
       agentInferenceMode = "enterprise";
-    } else if (agentProvider && localProviders.includes(agentProvider)) {
+    } else if (agentProvider && localLlmProviderIds.has(agentProvider)) {
       agentInferenceMode = "local";
     } else {
       agentInferenceMode = "providers";
