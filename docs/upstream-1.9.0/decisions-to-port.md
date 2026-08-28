@@ -17,6 +17,7 @@ Chaque entrée TO_PORT reçoit une classification avec preuve vérifiable.
 | 9 | a5e59ee4 (partiel) | Resume existing note on calendar join (_resumeExistingEventNote) | 861dcb2e | joinCalendarMeeting + handleNotificationResponse résument la note existante via getNoteByCalendarEventId au lieu de dupliquer |
 | 10 | 0c271fef, cd4dedc7 | Parakeet macOS capability gate (#862) | 6729f429 | `parakeetCapability.js` créé (floor 15.5) ; parakeet.js (pre-warm/checkInstallation/startServer/createOnlineStream/transcribe/download) ; picker désactive l'onglet NVIDIA sur macOS < 15.5 ; `verify-macos-parakeet.js` + vérif CI ; tests (3 pass) |
 | 11 | beedfd32 (partiel) | LLM fail-closed Custom endpoint routing (#1583) | 625f78f5 | `resolveConfiguredOpenAIBase` fail-closed (throw CUSTOM_ENDPOINT_INVALID au lieu de rerouter vers api.openai.com) ; `canBorrowCleanupCustomKey` ; `endpointInvalid` i18n ×10 ; tests (2 pass) |
+| 12 | 7bbc04c4 | Abort local transcription + diarization on upload cancel (#1401) | bf6035f3 | `uploadCancelRegistry.js` créé (multi-op par requestId) ; ipcHandlers transcribe-audio-file (whisper/parakeet) + diarize-audio-file + cloud partagent le registry ; diarization tue le child sur abort ; parakeetServer/WsServer ferment le websocket + arrêt segment loop ; whisperServer détruit /inference et rethrow AbortError avant fallback CPU ; renderer fileTranscription + types electron propagent requestId ; tests (7+4+3+2 = 16 pass) |
 
 ## B. RECLASSÉS NOT_APPLICABLE (couche purgée / feature absente) — preuve vérifiable
 
@@ -40,6 +41,8 @@ Chaque entrée TO_PORT reçoit une classification avec preuve vérifiable.
 ## Résultat
 
 - Zéro TO_PORT applicable restant.
-- 11 chantiers PORTÉS (commits séparés, type: sujet, sans trailer).
+- 12 chantiers PORTÉS (commits séparés, type: sujet, sans trailer) — le
+  12e (7bbc04c4, abort uploads) est porté par bf6035f3.
 - 5 NOT_APPLICABLE + 4 EQUIVALENT documentés avec preuves.
-- L'inventaire docs/upstream-1.9.0/inventory.md est mis à jour en conséquence.
+- L'inventaire docs/upstream-1.9.0/inventory.md est mis à jour en conséquence
+  (103 PORTED / 71 EQUIVALENT / 48 NOT_APPLICABLE / 0 TO_PORT / 2 ALREADY_PRESENT).

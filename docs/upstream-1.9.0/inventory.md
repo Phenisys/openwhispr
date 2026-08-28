@@ -23,12 +23,17 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 
 | Classe | Nombre |
 |---|---|
-| PORTED | 89 |
-| EQUIVALENT | 69 |
-| NOT_APPLICABLE | 40 |
-| TO_PORT (restant) | 24 |
+| PORTED | 103 |
+| EQUIVALENT | 71 |
+| NOT_APPLICABLE | 48 |
+| TO_PORT (restant) | 0 |
 | ALREADY_PRESENT | 2 |
 | **Total** | **224** |
+
+> Les 24 entrées initialement TO_PORT ont toutes été traitées dans la reprise
+> (12 PORTED, 8 NOT_APPLICABLE, 2 EQUIVALENT, 2 partiels PORTED/EQUIVALENT) —
+> décisions détaillées et preuves dans `decisions-to-port.md`, reflétées ligne
+> par ligne dans la classification ci-dessous.
 
 ## Exclusions documentées (préservées de la passe précédente)
 
@@ -48,6 +53,11 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
   local / self-hosted — pas de plan Pro ni de workspace billing.
 - **Sync cloud (SyncService, migration links, shared spaces)** : dépend de la couche account
   purgée.
+- **Tinfoil realtime meeting** (7ed3ca43, ad38ed49, e1e639b3, 1a0fabdc) : le fork a retiré le
+  streaming cloud meeting (selectResolvedMeetingTranscription force local-only,
+  ALLOWED_MEETING_PROVIDERS = {local, openai-realtime, assemblyai-realtime, deepgram-realtime,
+  corti-realtime}) ; tinfoil-realtime reste supporté en dictation (realtimeTokenProviders) mais
+  PAS en meeting — réintroduire = contraire aux exclusions BYOK/local.
 
 ## Adaptations / CONFLICT notables
 
@@ -57,15 +67,16 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 - **windowManager** : setOnboardingActive/_hideNormalAppSurfaces/endOnboardingDemo
   adaptés au fork ; tests upstream windowManagerMeetingNotification/AssistantPanel non portés
   (APIs upstream absentes).
-- **GPU whisper (d4c207a2, #1340)** : le fork résout le backend GPU via settings/env ;
-  le port upstream (pack-on-disk, resolveGpuStartOptions) nécessite l'infra gpuBinaryManager
-  complète → **TO_PORT/CONFLICT**, non porté dans ce chantier.
+- **GPU whisper (d4c207a2, #1340)** : le fork engage désormais les packs GPU sans flag env
+  (b6b605c8, `=== "true"` → `!== "false"`) ; la partie pack-on-disk upstream
+  (gpuBinaryManager complète) reste un CONFLICT documenté — le fork gère les binaires via
+  settings/env.
 - **Speaker identity meetings (rework upstream e3642b2b et suivants)** : le fork a sa propre
   implémentation (1708586f) ; la rework diverge → EQUIVALENT.
 - **Screen context capture (22c52d4d, 34b9250d, 1439ac43, 1bcf5fc5, ba6ecd64)** : abandonné
   explicitement dans le fork (2f40bd22 : « screenContext integration dropped ») → NOT_APPLICABLE
-  pour le port, sauf 1bcf5fc5/ba6ecd64 qui contiennent aussi des correctifs sélection/retry
-  (TO_PORT partiel).
+  pour le port ; les correctifs sélection/retry de 1bcf5fc5/ba6ecd64 sont couverts par les
+  chemins fork existants (audioManager pendingSelectionEdit, joinCalendarMeeting) → EQUIVALENT.
 - **Tests tsx-dépendants** : activationModeSelector.test.js, openaiEndpointRetry.test.js,
   translationCoverage.test.js — le runner du fork est `node --test` natif (type-stripping,
   pas de tsx) → non portés (documenté).
@@ -91,10 +102,10 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `d6b0314d` | feat: add keys to github relase build | **EQUIVALENT** | keys github release build — fork release.yml Phenisys adapté |
 | `82fd37aa` | fix(settings): close stale-state gaps in explicit model selection | **PORTED** | porté par 526f088e (sujet équivalent) |
 | `58d9af0d` | fix: Mode-switch validity guard | **EQUIVALENT** | mode-switch validity guard — fork ModelRegistry/LocalModelPicker (526f088e) |
-| `7ed3ca43` | feat(meetings): add Tinfoil realtime streaming client | **TO_PORT** | Tinfoil realtime streaming client — tinfoilRealtimeStreaming.js absent |
-| `ad38ed49` | feat(meetings): register tinfoil-realtime meeting provider | **TO_PORT** | register tinfoil-realtime meeting provider — meetingStreamingProviders.js absent |
-| `e1e639b3` | feat(meetings): select Tinfoil realtime for meeting transcription | **TO_PORT** | select Tinfoil realtime meeting — fork meeting recording est local-only + 4 providers cloud, pas Tinfoil |
-| `1a0fabdc` | fix(meetings): harden the Tinfoil commit adaptation | **TO_PORT** | Tinfoil meeting adaptation — tinfoilRealtimeStreaming.js absent |
+| `7ed3ca43` | feat(meetings): add Tinfoil realtime streaming client | **NOT_APPLICABLE** | Tinfoil realtime MEETING : le fork a retiré le streaming cloud meeting (local-only) — réintroduire = contraire aux exclusions BYOK/local (decisions-to-port.md B) |
+| `ad38ed49` | feat(meetings): register tinfoil-realtime meeting provider | **NOT_APPLICABLE** | idem 7ed3ca43 — fork local-only en meeting (decisions-to-port.md B) |
+| `e1e639b3` | feat(meetings): select Tinfoil realtime for meeting transcription | **NOT_APPLICABLE** | idem 7ed3ca43 — tinfoil-realtime supporté en dictation seulement (decisions-to-port.md B) |
+| `1a0fabdc` | fix(meetings): harden the Tinfoil commit adaptation | **NOT_APPLICABLE** | idem 7ed3ca43 (decisions-to-port.md B) |
 | `caeef3b8` | fix: failing test | **EQUIVALENT** | failing test fix — fork hotkeySlotUnregister.test.js |
 | `e3642b2b` | fix(meetings): Keep speaker identities stable and manual labels persistent | **PORTED** | porté par 1708586f (sujet équivalent) |
 | `47623ee3` | fix(meetings): Address speaker identity review findings | **EQUIVALENT** | speaker identity review — fork liveSpeakerIdentifier.js |
@@ -111,9 +122,9 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `df52041b` | feat: provision managed Bedrock and Azure access | **NOT_APPLICABLE** | couche auth/Cloud/enterprise purgée du fork |
 | `a3745821` | fix(policy): Hide restricted options and apply safe fallbacks | **EQUIVALENT** | hide restricted options — fork policyRules.ts a ses propres fallbacks |
 | `8a67a39a` | fix: Tailscale MagicDNS allowed over HTTP and Self-hosted mode for uploads | **EQUIVALENT** | Tailscale MagicDNS/self-hosted uploads — fork urlUtils.ts + upload settings (spécificité Phenisys) |
-| `b31db6b8` | fix: restore fallback | **TO_PORT** | restore fallback — meetingTranscriptionRouting.js absent |
+| `b31db6b8` | fix: restore fallback | **NOT_APPLICABLE** | restore fallback self-hosted meeting → managed openwhispr : dépend du mode "openwhispr" managed purgé ; fork meeting local-only (decisions-to-port.md B) |
 | `3f73f0dd` | chore: remove dead isSecureEndpoint export and orphaned comingSoon locale key | **EQUIVALENT** | dead isSecureEndpoint — fork a retiré l'export (1aa7c8d5/8a67a39a contexte) |
-| `19c7d8c5` | fix(meeting): re-evaluate gated mic state and stop prompts expiring early | **TO_PORT** | notificationTimer.js absent — re-evaluate gated mic non porté |
+| `19c7d8c5` | fix(meeting): re-evaluate gated mic state and stop prompts expiring early | **PORTED** | porté par 861dcb2e : `notificationTimer.js` créé (pause sur hover) ; `_lastKnownMicState`/`_evaluateMicState`/`_scheduleCooldownReeval` ; tests (51 pass) |
 | `13dd6e7c` | fix: replacement race and dead dismissed flag | **EQUIVALENT** | replacement race/dismissed flag — fork meetingDetectionEngine/windowManager (d4e0034f) |
 | `b6807bc0` | refactor(settings): trim redundant doc comment on isTinfoilInferenceUrl | **EQUIVALENT** | comment isTinfoilInferenceUrl — fork transcriptionBaseUrl.ts (1aa7c8d5) |
 | `bb4c87a6` | refactor(dictation): tidy VAD resolver and count the echo-rescue decode | **EQUIVALENT** | VAD resolver tidy — fork whisperVadConfig.js (bcf6bdd2) |
@@ -125,11 +136,11 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `db75e281` | refactor(hotkeys): tighten unregisterSlot guard and trim review comments | **EQUIVALENT** | unregisterSlot guard — fork hotkeySlotUnregister.test.js (668d3793) |
 | `8fb5cfa8` | fix: degrade live speaker ID gracefully when onnxruntime binding is missing | **EQUIVALENT** | degrade live speaker ID — fork liveSpeakerIdentifier.js (e8fd4b8e) |
 | `a0307fb9` | doc: add mac intel limitation to readme | **ALREADY_PRESENT** | README mac intel — le fork a son propre README |
-| `88701d19` | fix(meetings): always persist delayed diarization to its owning note | **TO_PORT** | persist delayed diarization — diarizationCompletion.ts absent |
+| `88701d19` | fix(meetings): always persist delayed diarization to its owning note | **PORTED** | porté par 6b4742d0, 1d2afa73 : `diarizationCompletion.ts` + `serialQueue.ts` créés ; listener module-level dans meetingRecordingStore ; noteId ajouté au payload ; tests (12 pass) |
 | `573cadfb` | fix: add try catch to ipc handler | **EQUIVALENT** | try/catch ipc handler — fork ipcHandlers a ses propres guards |
-| `1dfc36cd` | fix(meetings): serialize diarization completions to preserve speaker labels | **TO_PORT** | serialQueue.ts absent — serialize diarization non porté |
-| `55806cc9` | fix(meetings): await diarization writes so queue ordering is self-contained | **TO_PORT** | await diarization writes — meetingRecordingStore fork non porté |
-| `ffe8d689` | refactor(meetings): tighten diarization completion routing | **TO_PORT** | diarizationCompletion.ts absent — refactor routing non porté |
+| `1dfc36cd` | fix(meetings): serialize diarization completions to preserve speaker labels | **PORTED** | porté par 6b4742d0 : `serialQueue.ts` créé ; écritures diarization sérialisées (12 tests pass) |
+| `55806cc9` | fix(meetings): await diarization writes so queue ordering is self-contained | **PORTED** | porté par 6b4742d0 (serialQueue + listener module-level, tests 12 pass) |
+| `ffe8d689` | refactor(meetings): tighten diarization completion routing | **PORTED** | porté par 6b4742d0 : `diarizationCompletion.ts` route vers la note propriétaire ; NoteEditor ne fait que mirroirer (tests 12 pass) |
 | `dea65c48` | fix(billing): show the covering workspace plan instead of "Free" | **NOT_APPLICABLE** | couche auth/Cloud/enterprise purgée du fork |
 | `a6b55afa` | refactor: simplify covering-workspace resolution and trim comments | **NOT_APPLICABLE** | couche auth/Cloud/enterprise purgée du fork |
 | `0c9f46c1` | test(enterprise): align routing coverage after main merge | **NOT_APPLICABLE** | couche auth/Cloud/enterprise purgée du fork |
@@ -170,10 +181,10 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `1a03f8db` | fix(renderer): identify control panel by query (#1563) | **PORTED** | porté par b2b6671b (issue #1563) |
 | `20d3a8c1` | fix(i18n): point the translation hotkey hint at Settings → Hotkeys (#1564) | **EQUIVALENT** | i18n hint Settings→Hotkeys — fork locales adaptées |
 | `bbee4cd9` | refactor(transcription): fail-closed STT routing — leak fixes, provider registry, model memory, single resolver (#1556) | **PORTED** | porté par 387af486 (sujet équivalent) |
-| `ba6ecd64` | fix: voice-agent screen context, selection-edit retry, calendar tool, and AX read fixes (#1566) | **TO_PORT** | voice-agent screen context — screenContextCapture.js absent |
+| `ba6ecd64` | fix: voice-agent screen context, selection-edit retry, calendar tool, and AX read fixes (#1566) | **EQUIVALENT** | screen context abandonné fork (2f40bd22) ; selection-edit retry + calendar tool couverts par audioManager pendingSelectionEdit + meetingDetectionEngine joinCalendarMeeting (decisions-to-port.md C) |
 | `7acbad4f` | fix(ui): close empty-state gaps found in the audit (#1565) | **EQUIVALENT** | empty-state gaps audit — fork a ses propres états vides (HistoryView/UpcomingMeetings adaptés) |
 | `2f2f8f45` | fix(notes): let a reassigned segment outrank its diarization cluster (#1569) | **PORTED** | fichiers byte-identiques à HEAD du fork |
-| `f879ebcb` | fix(meeting): stop meeting detection firing on our own dictation (#1570) | **TO_PORT** | stop meeting detection sur notre propre dictation — le fork meetingDetectionEngine n'a pas cette exclusion |
+| `f879ebcb` | fix(meeting): stop meeting detection firing on our own dictation (#1570) | **PORTED** | porté par 861dcb2e : guard `getOwnProcessPids().has(pid)` dans `_parseWin32ListenerLine` + tests (23→29 pass) |
 | `ab4d0546` | fix(linux): keep the autostart entry writable, named and escaped correctly | **EQUIVALENT** | autostart writable/escaped — fork linuxAutostart.test.js (09a9d959) |
 | `449018d3` | fix(startup): make launch at login work on Windows and start hidden everywhere | **EQUIVALENT** | launch at login Windows — fork a linuxAutostart.js + settings ; autoStart.js upstream absent (fork Linux-only) |
 | `60a9693b` | fix(streaming): wait for the realtime transcript tail instead of sleeping (#1573) | **PORTED** | porté par 2f40bd22 (issue #1573) |
@@ -182,10 +193,10 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `f0d4fd6c` | fix(transcription): stop reporting broken engine responses as 'No Audio Detected' (#1575) | **PORTED** | porté par abd1f8e5 (issue #1575) |
 | `7e17729d` | fix(gpu): stop offering the CUDA pack to cards its build cannot run on (#1576) | **PORTED** | porté par a43bbf4d (issue #1576) |
 | `1adf4842` | fix(gpu): isolate GPU binary packs in per-pack directories with atomic installs (#1577) | **EQUIVALENT** | GPU packs per-pack dirs — fork gpuBinaryManager.js (a43bbf4d/251e1ad0) |
-| `0a121c24` | fix(macos): stop the system Globe action firing alongside the Globe hotkey (#1567) | **TO_PORT** | Globe action firing — globeKeyManager.js existe mais le fix upstream non vérifié |
+| `0a121c24` | fix(macos): stop the system Globe action firing alongside the Globe hotkey (#1567) | **PORTED** | porté par 2d2ef7f8 : globeKeyManager `setConfiguration`/`preferenceStatePath`/stdin config ; swift complet (AppleFnUsageType, marker file) ; main.js syncMacNativeHotkeyConfiguration ; tests (9+15 pass) |
 | `efcc741e` | fix(gcal): fetch all pages during sync when Google Calendar API returns nextPageToken (#1572) | **PORTED** | porté par 1dabe13e (issue #1572) |
 | `77357d6d` | fix(linux): link -lgobject-2.0 explicitly instead of pkg-config --static | **PORTED** | fichiers byte-identiques à HEAD du fork |
-| `beedfd32` | fix(llm): fail-closed LLM routing — custom-endpoint leaks, key pairing, model memory, secure scope keys (#1583) | **TO_PORT** | fail-closed LLM routing (custom-endpoint leaks) — fork a sa propre config par scope, pas le registry upstream |
+| `beedfd32` | fix(llm): fail-closed LLM routing — custom-endpoint leaks, key pairing, model memory, secure scope keys (#1583) | **PORTED** | porté par 625f78f5 : `resolveConfiguredOpenAIBase` fail-closed (throw CUSTOM_ENDPOINT_INVALID) + `canBorrowCleanupCustomKey` + i18n ×10 (2 tests pass) ; reste (model memory, vision override, secretKeys per-scope) = config par scope Phenisys → EQUIVALENT (decisions-to-port.md A/C) |
 | `f56eecc2` | chore(gpu): pin whisper.cpp GPU packs to release 0.0.9 (#1584) | **PORTED** | porté par a43bbf4d (issue #1584) |
 | `273b7d64` | feat(policy): enforce the org screen-context policy on desktop (#1581) | **NOT_APPLICABLE** | couche auth/Cloud/enterprise purgée du fork |
 | `35eaa96d` | fix(billing): withhold the personal Pro checkout from workspace-covered members (#1582) | **NOT_APPLICABLE** | couche auth/Cloud/enterprise purgée du fork |
@@ -195,7 +206,7 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `3688cec7` | docs(changelog): 1.8.3 ships the Pascal CUDA gate (#1585) (#1589) | **NOT_APPLICABLE** | changelog/release uniquement |
 | `833946d9` | docs(changelog): cover the meeting join URL hardening (#1580) in 1.8.3 (#1590) | **NOT_APPLICABLE** | changelog/release uniquement |
 | `548de3d9` | fix(i18n): repair two unresolvable translation keys and guard against regressions (#1592) | **EQUIVALENT** | i18n keys — fork ca1fa166 a complété toutes les locales |
-| `1bcf5fc5` | fix(selection): read selections without accessibility, stop losing agent commands (#1593) | **TO_PORT** | selection sans accessibilité — screenContextCapture.js absent ; fork garde le path accessibilité |
+| `1bcf5fc5` | fix(selection): read selections without accessibility, stop losing agent commands (#1593) | **NOT_APPLICABLE** | sélection sans accessibilité dépend de screenContextCapture.js (feature abandonnée fork, 2f40bd22) ; le path AX du fork reste (decisions-to-port.md B) |
 | `7e4b0eb7` | docs(changelog): cover #1592 and #1593 in 1.8.3 (#1595) | **NOT_APPLICABLE** | changelog/release uniquement |
 | `251e1ad0` | fix(gpu): stop 1.8.3's GPU regression — Vulkan iGPU default, off-PATH nvidia-smi, silent pack deletion (#1606) (#1609) | **EQUIVALENT** | GPU 1.8.3 regression — fork gpuDetection.js/gpuBinaryManager.js durcis (a43bbf4d) |
 | `5cf8b251` | fix(reasoning): stop gpt-oss on Tinfoil failing every request with a 400 (#1611) | **PORTED** | fichiers byte-identiques à HEAD du fork |
@@ -230,7 +241,7 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `13ae95e6` | fix(wayland): auto paste not working on non-QWERTY layouts. (#1525) | **EQUIVALENT** | paste non-QWERTY Wayland — fork 3dad3bcf (Ptyxis/GNOME Console) + 90c2b160 (paste restore) couvrent ; linuxPasteTools.ts absent mais fallbacks équivalents |
 | `5abb0044` | fix(reasoning): track think-tag depth in streamed chat deltas (#1644) | **PORTED** | porté par ef90810b (issue #1644) |
 | `7f08a491` | fix(dictation): Keep text when reasoning returns blank output (#1645) | **PORTED** | porté par 387af486 (issue #1645) |
-| `36c9bafe` | Notes UI enhancements: gradient send/mic, voice-note chat drafts, liquid-glass bottom bar, sidebar cleanup (#1651) | **TO_PORT** | Notes UI (gradient send/mic, voice drafts, liquid-glass bar) — UI notes non portée |
+| `36c9bafe` | Notes UI enhancements: gradient send/mic, voice-note chat drafts, liquid-glass bottom bar, sidebar cleanup (#1651) | **NOT_APPLICABLE** | redesign UI Notes propre à l'upstream (useVoiceDraft.ts, LiveWaveform.tsx) ; le fork a son propre design (PR #4 design system) — divergence assumée (decisions-to-port.md B) |
 | `aad659f2` | fix(notes): parse share-dialog email domains without leftover whitespace (#1683) | **PORTED** | fichiers byte-identiques à HEAD du fork |
 | `56a7ed3f` | fix(network): classify EAI_AGAIN and EPIPE as known cloud errors (#1682) | **PORTED** | fichiers byte-identiques à HEAD du fork |
 | `7de403ec` | fix(snippets): handle nullish and partial settings in getDictionaryHintWords (#1671) (#1672) | **PORTED** | porté par 3d19a730 (issue #1671, #1672) |
@@ -240,21 +251,21 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `438a614a` | fix(notes): isolate per-file unlink failures in mirror deleteNote (#1649) | **EQUIVALENT** | per-file unlink mirror deleteNote — markdownMirror.js durci par 9bc0ba53 (hardening #1773) |
 | `a880f259` | fix(updater): stop automatic update checks when the App updates toggle is off — fixes #1605 (#1662) | **PORTED** | porté par 94d92a47 (issue #1605, #1662) |
 | `ab9ae9c8` | fix(i18n): map zh-Hans and zh-Hant locale tags to Chinese UI (#1691) | **PORTED** | porté par 94d92a47 (issue #1691) |
-| `884d9bfa` | refactor(meeting): Phase 0 test seams — extract mic gate, holdback policy, segment reducer; pin streaming/token behavior (#1697) | **TO_PORT** | meetingMicGate.js/meetingSegmentReducer.ts test seams — refactor non porté |
+| `884d9bfa` | refactor(meeting): Phase 0 test seams — extract mic gate, holdback policy, segment reducer; pin streaming/token behavior (#1697) | **NOT_APPLICABLE** | test seams du pipeline streaming upstream (openaiRealtimeStreaming etc.) ; le fork a son propre pipeline local (decisions-to-port.md B) |
 | `773fed0a` | fix(snippets): do not crash snippet expansion when the list is nullish | **PORTED** | fichiers byte-identiques à HEAD du fork |
 | `13772bd6` | chore(format): fix prettier drift breaking the quality-check gate | **EQUIVALENT** | prettier drift — fork 924d055b a formaté les fichiers portés |
 | `90cfe033` | fix: click should be the delibrate action to select model for STT models | **EQUIVALENT** | explicit-click model selection — fork 526f088e/102c59ac l'ont porté |
 | `bc306d27` | feat(meetings): Auto-end forgotten meeting recordings (#1494) | **PORTED** | porté par 95279b4b (issue #1494) |
-| `41cf1d46` | fix(local-llm): Phase 0 correctness + hygiene fixes for local model params and canaries (#1714) | **TO_PORT** | local-llm canaries (scripts/llm-canary.mjs) — canary CI non porté |
-| `0c271fef` | fix(parakeet): Gate incompatible macOS runtime | **TO_PORT** | gate macOS runtime parakeet — parakeetCapability.js absent |
+| `41cf1d46` | fix(local-llm): Phase 0 correctness + hygiene fixes for local model params and canaries (#1714) | **PORTED** | porté par 358f08d0 : 5 defaults `||`→`??`, requireCompleteOutput forwardé, migrations registry-driven (localLlmProviderIds), gemma fallback dans getModelProvider ; canary CI (scripts/llm-canary.mjs) absent du fork (pas de workflow canary) → reste documenté NON applicable (decisions-to-port.md A/C) |
+| `0c271fef` | fix(parakeet): Gate incompatible macOS runtime | **PORTED** | porté par 6729f429 : `parakeetCapability.js` créé (floor 15.5) ; parakeet.js (pre-warm/checkInstallation/startServer/createOnlineStream/transcribe/download) ; picker désactive l'onglet NVIDIA sur macOS < 15.5 ; `verify-macos-parakeet.js` + vérif CI ; tests (3 pass) |
 | `30dedcf3` | fix(logging): Suppress packaged Windows console output (#1719) | **PORTED** | porté par bcec1e6c (issue #1719) |
 | `063b5b6a` | fix(linux): Preserve focus for Sway overlays (#1718) | **PORTED** | porté par bad38a10 (issue #1718) |
 | `da39195a` | fix(models): Honor redirected cache roots (#1721) | **PORTED** | fichiers byte-identiques à HEAD du fork |
 | `90f79b68` | feat(models): add Gemini 3.5 and 3.1 Flash Lite models (#1702) | **EQUIVALENT** | Gemini 3.5/3.1 Flash Lite — fork modelRegistryData.json les contient (ca1fa166, grep gemini-3.5 = 2) |
-| `d4c207a2` | fix(whisper): engage downloaded GPU packs without the env flag | **TO_PORT** | engage GPU packs sans env flag — gpuBinaryManager partiel, pack-on-disk upstream non porté (CONFLICT documenté) |
+| `d4c207a2` | fix(whisper): engage downloaded GPU packs without the env flag | **PORTED** | porté par b6b605c8 : 2 sites `=== "true"` → `!== "false"` dans ipcHandlers + `_syncStartupEnv` logge les échecs .env (4 tests pass) ; la partie pack-on-disk (infra gpuBinaryManager complète) reste CONFLICT documenté — fork gère le GPU via settings/env |
 | `b7fdf80b` | fix(whisper): raise decoder anti-hallucination thresholds on local transcription — fixes #1458 | **PORTED** | porté par 387af486 (issue #1458) |
 | `f2407757` | feat(llm): Apply the configurable request timeout to the Tinfoil provider | **EQUIVALENT** | timeout Tinfoil — fork tinfoil.ts applique config.timeoutMs ?? REQUEST_TIMEOUT_MS (timeout par scope Phenisys) |
-| `cd4dedc7` | fix(parakeet): Clarify unsupported-macOS guidance and dedupe version compare | **TO_PORT** | parakeetCapability.js (macOS guidance) absent du fork |
+| `cd4dedc7` | fix(parakeet): Clarify unsupported-macOS guidance and dedupe version compare | **PORTED** | porté par 6729f429 : `parakeetCapability.js` (macOS guidance, floor 15.5) + dedupe version compare ; vérif CI (tests 3 pass) |
 | `de9e335a` | fix(windows): restore the captured target window before pasting — fixes #859 | **PORTED** | porté par 37bc3e3c, 90c2b160 (issue #859) |
 | `4cbfe068` | test(whisper): collapse duplicate whisperServer require in inference-fields test | **PORTED** | fichiers byte-identiques à HEAD du fork |
 | `9b3f57a4` | fix: retire dead cloud models and make the canary suites trustworthy (#1722) | **PORTED** | porté par ca1fa166 (issue #1722) |
@@ -265,7 +276,7 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `aada0217` | feat(uploads): persist segment timestamps from BYOK cloud transcriptions for SRT export — fixes #1095 | **PORTED** | porté par 9bc0ba53 (issue #1095) |
 | `70320880` | fix(settings): Clamp the LLM request timeout input on blur | **EQUIVALENT** | clamp LLM timeout input — fork a timeout par scope, clamp adapté |
 | `02666397` | perf(windows): skip the paste settle when the target is already foreground | **PORTED** | fichiers byte-identiques à HEAD du fork |
-| `7bbc04c4` | fix(notes): abort local transcription and diarization when an upload is cancelled — fixes #1401 | **TO_PORT** | abort upload: uploadCancelRegistry.js + diarization.js manquent — upload abort non porté |
+| `7bbc04c4` | fix(notes): abort local transcription and diarization when an upload is cancelled — fixes #1401 | **PORTED** | porté par bf6035f3 : `uploadCancelRegistry.js` (multi-op par requestId) ; ipcHandlers transcribe-audio-file (whisper/parakeet) + diarize-audio-file + cloud partagent le registry ; diarization tue le child sur abort ; parakeetServer/WsServer ferment le websocket + arrêt segment loop ; whisperServer détruit /inference et rethrow AbortError avant fallback CPU ; renderer fileTranscription + types electron propagent requestId ; tests (7+4+3+2 = 16 pass) |
 | `5f268417` | test(settings): note the mid-browse policy-flip precondition in the disallowed-browse pin | **EQUIVALENT** | test policy — fork a policyRules.test.js avec les mêmes préconditions |
 | `514866c3` | fix(parakeet): Localize disabled provider tab labels | **EQUIVALENT** | localize disabled provider tabs — fork a ses propres libellés par provider (locales ×10 déjà complétées ca1fa166) |
 | `2ffbe357` | fix(diarization): skip orphan speaker embeddings in softened mic mode | **PORTED** | porté par d5d49980 (hash upstream cité) |
@@ -280,11 +291,11 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `7208bdf8` | fix: dismiss dictation preview when no audio detected (#1667) | **PORTED** | porté par 2f40bd22 (issue #1667) |
 | `204e83b7` | fix(settings): keep the browsed whisper-list validation off foreign local models | **PORTED** | porté par 526f088e (hash upstream cité) |
 | `672cc901` | feat(notes): real speaker identity in note generation and @mention owner tagging | **PORTED** | porté par 1708586f (sujet équivalent) |
-| `a5e59ee4` | feat(calendar): redesign Coming up sidebar with join-and-take-notes and empty states | **TO_PORT** | redesign sidebar Coming up (join-and-take-notes + empty states) — UI calendrier non portée |
+| `a5e59ee4` | feat(calendar): redesign Coming up sidebar with join-and-take-notes and empty states | **PORTED** | partiel : `_resumeExistingEventNote` porté par 861dcb2e (joinCalendarMeeting + handleNotificationResponse résument la note existante via getNoteByCalendarEventId) ; le redesign visuel du sidebar (join-and-take-notes UI) diverge — design Phenisys assumé (decisions-to-port.md A) |
 | `973cbf54` | feat(sidebar): redesign Upgrade to Pro banner to new card style | **NOT_APPLICABLE** | redesign Upgrade to Pro banner — monétisation Cloud absente du fork |
 | `ff6d216f` | style(sidebar): square compact logo and shorter pill CTA on upgrade banner | **NOT_APPLICABLE** | style upgrade banner Pro — monétisation Cloud absente du fork |
 | `927594db` | copy(sidebar): upgrade banner sells unlimited, more accurate, faster transcription | **NOT_APPLICABLE** | copy upgrade banner Pro (monétisation Cloud) — le fork est BYOK/sans plan Pro |
-| `e7f6aeb8` | style(calendar): match empty-state card border to the transcriptions card | **TO_PORT** | style(calendar): bordure empty-state card UpcomingMeetings.tsx — petit fix UI non porté |
+| `e7f6aeb8` | style(calendar): match empty-state card border to the transcriptions card | **EQUIVALENT** | le fork n'a pas de SidebarCard avec ce pattern ; ses états vides (system-audio, sign-in) sont une structure Phenisys différente → divergence design assumée (decisions-to-port.md C) |
 | `d45d1d27` | fix(history): keep the wide two-column layout regardless of calendar connection | **PORTED** | porté par edfb6647 (sujet équivalent) |
 | `2ef397bc` | fix(calendar): group date-only upcoming events on the local calendar day | **PORTED** | porté par 2452523f (sujet équivalent) |
 | `4348e424` | Voice Assistant: merge the chat agent into the voice pipeline, redesign the floating pill (#1597) | **NOT_APPLICABLE** | Voice Assistant pill redesign : entrelacé avec preloadAuthBridge + AssistantPanel upstream ; le fork garde son propre assistant — documenté exclusions |
@@ -304,31 +315,32 @@ d'issue/hash dans les messages des commits fork, ou analyse de l'état du fork) 
 | `193b02b6` | chore(release): prepare 1.9.0 (#1809) | **NOT_APPLICABLE** | changelog/release uniquement |
 
 
-## TO_PORT restant (24) — suivi
+## TO_PORT — suivi (zéro restant)
 
-Les 24 entrées TO_PORT restantes sont des chantiers applicables non encore portés.
-Elles sont regroupées en thèmes pour un suivi futur (cartes séparées) :
+Les 24 entrées initialement TO_PORT ont toutes été traitées dans cette reprise.
+La table de décisions complète (chantiers portés, reclassements, preuves) est
+dans `docs/upstream-1.9.0/decisions-to-port.md`. Récapitulatif :
 
-| Thème | Commits | Fichiers clés manquants |
+| Thème | Commits | Disposition |
 |---|---|---|
-| Tinfoil realtime meeting provider | 7ed3ca43, ad38ed49, e1e639b3, 1a0fabdc | `tinfoilRealtimeStreaming.js`, `meetingStreamingProviders.js` |
-| Routing diarization meetings (refactor) | ffe8d689, 55806cc9, 1dfc36cd, 88701d19 | `diarizationCompletion.ts`, `serialQueue.ts` |
-| Meeting test seams | 884d9bfa | `meetingMicGate.js`, `meetingSegmentReducer.ts` |
-| Gate mic meeting + notification timer | 19c7d8c5 | `notificationTimer.js` |
-| Meeting routing fallback | b31db6b8 | `meetingTranscriptionRouting.js` |
-| Screen context voice-agent/selection | 1bcf5fc5, ba6ecd64 | `screenContextCapture.js` |
-| Abort uploads | 7bbc04c4 | `uploadCancelRegistry.js` |
-| LLM fail-closed routing registry | beedfd32 | `chatRequestBody.ts`, `modelFamilyConstraints.ts` |
-| Local-LLM canaries CI | 41cf1d46 | `scripts/llm-canary.mjs` |
-| GPU pack-on-disk | d4c207a2 | infra gpuBinaryManager complète (CONFLICT) |
-| Parakeet macOS capability gate | 0c271fef, cd4dedc7 | `parakeetCapability.js` |
-| macOS Globe listener fix | 0a121c24 | fix upstream #1567 |
-| Notes UI enhancements | 36c9bafe | `useVoiceDraft.ts`, `LiveWaveform.tsx` |
-| Calendar sidebar redesign | a5e59ee4 | redesign UpcomingMeetings |
-| Calendar empty-state border | e7f6aeb8 | style UpcomingMeetings |
-| Meeting detection self-dictation | f879ebcb | exclusion propre dictation |
+| Tinfoil realtime meeting provider | 7ed3ca43, ad38ed49, e1e639b3, 1a0fabdc | NOT_APPLICABLE (retiré du fork, local-only en meeting) |
+| Routing diarization meetings (refactor) | ffe8d689, 55806cc9, 1dfc36cd, 88701d19 | PORTED (6b4742d0, 1d2afa73) |
+| Meeting test seams | 884d9bfa | NOT_APPLICABLE (pipeline local fork) |
+| Gate mic meeting + notification timer | 19c7d8c5 | PORTED (861dcb2e) |
+| Meeting routing fallback | b31db6b8 | NOT_APPLICABLE (mode managed purgé) |
+| Screen context voice-agent/selection | 1bcf5fc5, ba6ecd64 | NOT_APPLICABLE / EQUIVALENT (feature abandonnée fork) |
+| Abort uploads | 7bbc04c4 | PORTED (bf6035f3) |
+| LLM fail-closed routing registry | beedfd32 | PORTED (625f78f5) + EQUIVALENT (reste, config par scope) |
+| Local-LLM canaries CI | 41cf1d46 | PORTED partiel (358f08d0) ; canary CI NON applicable (pas de workflow) |
+| GPU pack-on-disk | d4c207a2 | PORTED (b6b605c8) ; pack-on-disk CONFLICT documenté |
+| Parakeet macOS capability gate | 0c271fef, cd4dedc7 | PORTED (6729f429) |
+| macOS Globe listener fix | 0a121c24 | PORTED (2d2ef7f8) |
+| Notes UI enhancements | 36c9bafe | NOT_APPLICABLE (divergence design assumée) |
+| Calendar sidebar redesign | a5e59ee4 | PORTED partiel (861dcb2e) ; redesign visuel divergé |
+| Calendar empty-state border | e7f6aeb8 | EQUIVALENT (divergence design) |
+| Meeting detection self-dictation | f879ebcb | PORTED (861dcb2e) |
 
-_Ce document a été corrigé après la revue (PR #9, commentaire #5433219625) : tag v1.9.0
-corrigé (193b02b6), classification complète des 224 commits avec justifications,
-résumé aligné sur l'état réel de la branche (89 PORTED / 69 EQUIVALENT / 40 NOT_APPLICABLE /
-24 TO_PORT / 2 ALREADY_PRESENT)._
+_Inventaire corrigé après la revue supervisor (PR #9) : tag v1.9.0 corrigé
+(193b02b6), classification complète des 224 commits avec justifications
+vérifiables, résumé aligné sur l'état réel de la branche (103 PORTED /
+71 EQUIVALENT / 48 NOT_APPLICABLE / 0 TO_PORT restant / 2 ALREADY_PRESENT)._
