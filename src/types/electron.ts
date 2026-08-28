@@ -572,7 +572,11 @@ export interface WhisperDownloadProgressData {
 export interface ParakeetCheckResult {
   installed: boolean;
   working: boolean;
+  supported?: boolean;
   path?: string;
+  code?: string;
+  message?: string;
+  minimumMacOSVersion?: string;
 }
 
 export interface ParakeetModelResult {
@@ -2169,6 +2173,7 @@ declare global {
       onMeetingDiarizationComplete?: (
         callback: (data: {
           sessionId?: string;
+          noteId?: number | null;
           segments: Array<{
             id: string;
             text: string;

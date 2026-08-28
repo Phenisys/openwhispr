@@ -47,7 +47,6 @@ import { parseTranscriptSegments } from "../../utils/parseTranscriptSegments";
 import {
   applyTranscriptSpeakerPatch,
   lockTranscriptSpeaker,
-  mergeTranscriptSegments,
   serializeTranscriptSegments,
 } from "../../utils/transcriptSpeakerState";
 import NoteParticipants from "./NoteParticipants";
@@ -405,47 +404,24 @@ export default function NoteEditor({
   }, [diarizationSessionId, isRecording, scheduleUiUpdate]);
 
   useEffect(() => {
-    const expectedSession = diarizationSessionId;
-    const cleanup = window.electronAPI?.onMeetingDiarizationComplete?.(async (data) => {
-      if (!expectedSession || data?.sessionId !== expectedSession) return;
+    const completedDiarization = useMeetingRecordingStore.getState().completedDiarization;
+    if (!completedDiarization || completedDiarization.noteId !== note.id) return;
+    // Consume so a remount can't repaint this overlay over newer edits; the
+    // transcript itself is already persisted.
+    useMeetingRecordingStore.setState({ completedDiarization: null });
+    setIsDiarizing(false);
 
-      setIsDiarizing(false);
+    const enriched = completedDiarization.segments;
+    if (enriched.length === 0) return;
+    setDiarizedSegments(enriched);
 
-      if (!data?.segments?.length) return;
-
-      // Store segments outlive their recording — only use them for the note they belong to.
-      const { recordingNoteId, segments: liveSegments } = useMeetingRecordingStore.getState();
-      const persisted = await window.electronAPI?.getNote?.(note.id);
-      const existing = persisted?.transcript
-        ? parseTranscriptSegments(persisted.transcript)
-        : recordingNoteId === note.id && liveSegments.length > 0
-          ? liveSegments
-          : displaySegmentsRef.current;
-
-      const enriched = mergeTranscriptSegments(
-        existing,
-        data.segments.map((s: any, i: number) => ({
-          ...s,
-          id: s.id || `diarized-${i}`,
-        }))
-      );
-      setDiarizedSegments(enriched);
-
-      window.electronAPI.updateNote(note.id, { transcript: serializeTranscriptSegments(enriched) });
-
-      if (data.speakerEmbeddings) {
-        window.electronAPI?.saveNoteSpeakerEmbeddings?.(note.id, data.speakerEmbeddings);
-      }
-
-      const autoMappings: Record<string, string> = {};
-      for (const s of enriched) {
-        if (s.speakerName && s.speaker) autoMappings[s.speaker] = s.speakerName;
-      }
-      if (Object.keys(autoMappings).length > 0) {
-        setSpeakerMappings((prev) => ({ ...autoMappings, ...prev }));
-      }
-    });
-    return () => cleanup?.();
+    const autoMappings: Record<string, string> = {};
+    for (const s of enriched) {
+      if (s.speakerName && s.speaker) autoMappings[s.speaker] = s.speakerName;
+    }
+    if (Object.keys(autoMappings).length > 0) {
+      setSpeakerMappings((prev) => ({ ...autoMappings, ...prev }));
+    }
   }, [note.id, diarizationSessionId]);
 
   const persistDisplaySegments = useCallback(
