@@ -488,6 +488,20 @@ class MeetingDetectionEngine {
 
         const eventSummary = detection.event?.summary || "New note";
 
+        const isRealEvent =
+          detection.event?.calendar_id &&
+          detection.event.calendar_id !== "__detected__" &&
+          detection.event.calendar_id !== "__manual__";
+
+        if (
+          isRealEvent &&
+          (await this._resumeExistingEventNote(detection.event, "calendar-join"))
+        ) {
+          this._meetingModeActive = true;
+          this.audioActivityDetector.resetPrompt();
+          return;
+        }
+
         const noteResult = this.databaseManager.saveNote(eventSummary, "", "meeting");
         const meetingsFolder = this.databaseManager.getMeetingsFolder();
 
@@ -503,11 +517,6 @@ class MeetingDetectionEngine {
         this._meetingModeActive = true;
 
         broadcastToWindows("note-added", noteResult.note);
-
-        const isRealEvent =
-          detection.event?.calendar_id &&
-          detection.event.calendar_id !== "__detected__" &&
-          detection.event.calendar_id !== "__manual__";
 
         if (isRealEvent) {
           const calEvent = this.databaseManager.getCalendarEventById(detection.event.id);
@@ -595,6 +604,11 @@ class MeetingDetectionEngine {
       return;
     }
 
+    // Joining the same event twice resumes its note instead of creating a duplicate.
+    if (await this._resumeExistingEventNote(calEvent, trigger)) {
+      return;
+    }
+
     const noteResult = this.databaseManager.saveNote(calEvent.summary || "New note", "", "meeting");
     const meetingsFolder = this.databaseManager.getMeetingsFolder();
 
@@ -624,22 +638,32 @@ class MeetingDetectionEngine {
     });
   }
 
-  handleNotificationTimeout() {
-    // Expiring unanswered is not a decline: only an audio prompt's timeout cools
-    // down the mic detector, so an ignored calendar reminder leaves mic detection
-    // armed and joining the call late still prompts.
-    const audioTimedOut = [...this.activeDetections.values()].some(
-      (d) => !d.dismissed && d.source === "audio"
-    );
-    if (audioTimedOut) {
-      this._dismiss();
-    }
-    this.activeDetections.clear();
+  /** Navigates to the note already linked to a calendar event, if any. */
+  async _resumeExistingEventNote(event, trigger) {
+    const existingNote = this.databaseManager.getNoteByCalendarEventId(event.id);
+    if (!existingNote?.id) return false;
     debugLogger.info(
-      "Notification auto-dismissed, detections cleared",
-      { audioTimedOut },
+      "Reusing existing note for calendar meeting",
+      { eventId: event.id, noteId: existingNote.id, trigger },
       "meeting"
     );
+    await this.windowManager.queueMeetingNoteNavigation({
+      noteId: existingNote.id,
+      folderId: existingNote.folder_id ?? this.databaseManager.getMeetingsFolder()?.id,
+      event,
+      trigger,
+    });
+    return true;
+  }
+
+  handleNotificationTimeout() {
+    // Expiring unanswered is not a decline, so no dismissal cooldown starts:
+    // the detector's hasPrompted flag already keeps the ongoing call from
+    // re-prompting, while a call starting right after the timeout still
+    // prompts. Only an explicit dismissal (handleNotificationResponse) cools
+    // the mic detector down.
+    this.activeDetections.clear();
+    debugLogger.info("Notification auto-dismissed, detections cleared", {}, "meeting");
   }
 
   _flushNotificationQueue() {

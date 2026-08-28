@@ -7,6 +7,7 @@ const MenuManager = require("./menuManager");
 const DevServerManager = require("./devServerManager");
 const dockManager = require("./dockManager");
 const { i18nMain } = require("./i18nMain");
+const { NotificationDismissTimer, getNotificationTimeoutMs } = require("./notificationTimer");
 const { DEV_SERVER_PORT } = DevServerManager;
 const {
   MAIN_WINDOW_CONFIG,
@@ -25,7 +26,12 @@ class WindowManager {
     this.controlPanelWindow = null;
     this.agentWindow = null;
     this.notificationWindow = null;
-    this._notificationTimeout = null;
+    this._notificationDismissTimer = new NotificationDismissTimer(() => {
+      if (this.meetingDetectionEngine) {
+        this.meetingDetectionEngine.handleNotificationTimeout();
+      }
+      this.dismissMeetingNotification();
+    });
     this.transcriptionPreviewWindow = null;
     this.updateNotificationWindow = null;
     this._updateNotificationDismissed = false;
@@ -132,6 +138,13 @@ class WindowManager {
   setNotificationInteractivity(interactive) {
     if (!this.notificationWindow || this.notificationWindow.isDestroyed()) {
       return;
+    }
+    // Hovering means the user is reading or about to click — the auto-dismiss
+    // countdown must not close the card under their pointer.
+    if (interactive) {
+      this._notificationDismissTimer.pause();
+    } else {
+      this._notificationDismissTimer.resume();
     }
     // Linux ignores the `forward` option, so a card returned to click-through
     // there never sees another mouseenter and Start/Dismiss stay unreachable
@@ -1217,10 +1230,7 @@ class WindowManager {
       this.notificationWindow.close();
       this.notificationWindow = null;
     }
-    if (this._notificationTimeout) {
-      clearTimeout(this._notificationTimeout);
-      this._notificationTimeout = null;
-    }
+    this._notificationDismissTimer.cancel();
 
     const display = screen.getPrimaryDisplay();
     const position = WindowPositionUtil.getNotificationPosition(display);
@@ -1266,19 +1276,11 @@ class WindowManager {
       }
     }, 3000);
 
-    this._notificationTimeout = setTimeout(() => {
-      if (this.meetingDetectionEngine) {
-        this.meetingDetectionEngine.handleNotificationTimeout();
-      }
-      this.dismissMeetingNotification();
-    }, 30000);
+    this._notificationDismissTimer.start(getNotificationTimeoutMs(promptData.source));
 
     this.notificationWindow.on("closed", () => {
       this.notificationWindow = null;
-      if (this._notificationTimeout) {
-        clearTimeout(this._notificationTimeout);
-        this._notificationTimeout = null;
-      }
+      this._notificationDismissTimer.cancel();
     });
   }
 
@@ -1298,10 +1300,7 @@ class WindowManager {
       clearTimeout(this._notificationReadyFallback);
       this._notificationReadyFallback = null;
     }
-    if (this._notificationTimeout) {
-      clearTimeout(this._notificationTimeout);
-      this._notificationTimeout = null;
-    }
+    this._notificationDismissTimer.cancel();
     if (this.notificationWindow && !this.notificationWindow.isDestroyed()) {
       this.notificationWindow.close();
     }
@@ -1320,11 +1319,8 @@ class WindowManager {
     };
     await this.showMeetingNotification(data);
     // The countdown overlay must stay until the user acts or it expires — the
-    // generic 30s notification timeout would close it mid-countdown.
-    if (this._notificationTimeout) {
-      clearTimeout(this._notificationTimeout);
-      this._notificationTimeout = null;
-    }
+    // generic notification timeout would close it mid-countdown.
+    this._notificationDismissTimer.cancel();
     return true;
   }
 
