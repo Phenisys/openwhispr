@@ -33,6 +33,7 @@ const { getTinfoilChatModels } = require("./tinfoilCatalog");
 const { transcribeWithTinfoil } = require("./tinfoilTranscription");
 const AudioStorageManager = require("./audioStorage");
 const { registerMeetingAutoEndKeepHandler } = require("./meetingAutoEndKeep");
+const { PARAKEET_UNSUPPORTED_OS_CODE } = require("./parakeetCapability");
 
 // Tinfoil's only realtime STT model — fallback when the renderer omits one.
 const TINFOIL_REALTIME_MODEL = "voxtral-mini-4b-realtime";
@@ -2816,6 +2817,9 @@ class IPCHandlers {
           success: false,
           error: error.message,
           code: error.code || "DOWNLOAD_FAILED",
+          ...(error.code === PARAKEET_UNSUPPORTED_OS_CODE
+            ? { message: error.message, minimumMacOSVersion: error.minimumMacOSVersion }
+            : {}),
         };
       }
     });
@@ -8903,6 +8907,7 @@ class IPCHandlers {
         hotkeyManager.unregisterSlot("voiceAgent");
         this.environmentManager.saveVoiceAgentKey?.("");
         this.windowManager.reconcileNativeKeyListeners();
+        this._notifyHotkeyChanged("");
         return { success: true, message: "Voice agent hotkey cleared" };
       }
 

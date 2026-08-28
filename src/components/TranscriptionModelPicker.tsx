@@ -33,6 +33,7 @@ import { API_ENDPOINTS, normalizeBaseUrl } from "../config/constants";
 import { GetApiKeyLink } from "./ui/GetApiKeyLink";
 import { getCachedPlatform } from "../utils/platform";
 import logger from "../utils/logger";
+import type { ParakeetCheckResult } from "../types/electron";
 
 interface LocalModel {
   model: string;
@@ -279,7 +280,12 @@ const PROVIDER_CREDENTIALS: Record<
 
 const TINFOIL_AUDIO_DOCS_URL = "https://docs.tinfoil.sh/models/audio";
 
-const LOCAL_PROVIDER_TABS: Array<{ id: string; name: string; disabled?: boolean }> = [
+const LOCAL_PROVIDER_TABS: Array<{
+  id: string;
+  name: string;
+  disabled?: boolean;
+  disabledLabel?: string;
+}> = [
   { id: "whisper", name: "OpenAI" },
   { id: "nvidia", name: "NVIDIA" },
 ];
@@ -375,6 +381,31 @@ export default function TranscriptionModelPicker({
     percentage: 0,
   });
   const [gpuDismissed, setGpuDismissed] = useState(false);
+  const [parakeetCapability, setParakeetCapability] = useState<ParakeetCheckResult | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    window.electronAPI
+      ?.checkParakeetInstallation?.()
+      .then((capability) => {
+        if (!cancelled) setParakeetCapability(capability);
+      })
+      .catch((error) => {
+        logger.error("Failed to check Parakeet compatibility", { error }, "models");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (parakeetCapability?.supported !== false || internalLocalProvider !== "nvidia") return;
+
+    setInternalLocalProvider("whisper");
+    onLocalProviderSelect?.("whisper");
+  }, [internalLocalProvider, onLocalProviderSelect, parakeetCapability]);
 
   useEffect(() => {
     if (selectedLocalProvider !== internalLocalProvider) {
@@ -658,14 +689,30 @@ export default function TranscriptionModelPicker({
     [providerAllowed]
   );
 
+  const localProviderTabs = useMemo(
+    () =>
+      LOCAL_PROVIDER_TABS.map((provider) =>
+        provider.id === "nvidia" && parakeetCapability?.supported === false
+          ? {
+              ...provider,
+              disabled: true,
+              disabledLabel: parakeetCapability.minimumMacOSVersion
+                ? `macOS ${parakeetCapability.minimumMacOSVersion}+`
+                : "Unavailable",
+            }
+          : provider
+      ),
+    [parakeetCapability]
+  );
+
   const handleLocalProviderChange = useCallback(
     (providerId: string) => {
-      const tab = LOCAL_PROVIDER_TABS.find((t) => t.id === providerId);
+      const tab = localProviderTabs.find((t) => t.id === providerId);
       if (tab?.disabled) return;
       setInternalLocalProvider(providerId);
       onLocalProviderSelect?.(providerId);
     },
-    [onLocalProviderSelect]
+    [localProviderTabs, onLocalProviderSelect]
   );
 
   const handleCloudModelSelect = useCallback(
@@ -1092,7 +1139,7 @@ export default function TranscriptionModelPicker({
       ) : (
         <>
           <ProviderTabs
-            providers={LOCAL_PROVIDER_TABS}
+            providers={localProviderTabs}
             selectedId={internalLocalProvider}
             onSelect={handleLocalProviderChange}
             colorScheme="purple"
