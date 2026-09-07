@@ -47,6 +47,14 @@ body:
       label: Références
       description: Issues liées, docs, liens, captures d'écran
       placeholder: "Ex. : #123, lien vers doc, capture…"
+  - type: input
+    id: version_release
+    attributes:
+      label: Version cible pour la release interne (optionnel)
+      description: Si renseignée, la release interne sera déclenchée automatiquement après traitement complet de l'issue. Utilisez uniquement une version sémantique sans le préfixe v, par exemple 1.8.2.
+      placeholder: "Ex. : 1.8.2 (laisser vide si aucune release n'est souhaitée)"
+    validations:
+      required: false
   - type: dropdown
     id: priorite
     attributes:
