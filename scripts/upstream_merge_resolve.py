@@ -125,26 +125,41 @@ def main():
     else:
         print("   OK : aucun chemin du manifeste n'est présent (%d vérifiés)" % len(forbidden))
 
-    # références orphelines laissées par les suppressions
-    orphans = []
-    for p in sorted(set(mechanical) | set(silent)) or forbidden:
-        base = Path(p).stem
-        if len(base) < 4:
-            continue
-        out, _err, rc = run(["git", "-C", repo, "grep", "-n", "-I", "-e", base,
-                             "--", "*.js", "*.mjs", "*.ts", "*.tsx", "*.jsx"])
+    # références orphelines laissées par les suppressions : on agrège par
+    # fichier référent, car l'unité de travail est « quel fichier survivant
+    # pointe encore sur un module supprimé », pas la liste des occurrences.
+    removed_paths = sorted(set(mechanical) | set(silent)) or forbidden
+    stems = {}
+    for p in removed_paths:
+        stems.setdefault(Path(p).stem, p)
+    referrers = {}
+    if stems:
+        pattern = "|".join(re.escape(s) for s in sorted(stems, key=len, reverse=True) if len(s) >= 4)
+        out, _err, rc = run(["git", "-C", repo, "grep", "-n", "-I", "-E", pattern,
+                             "--", "*.js", "*.mjs", "*.cjs", "*.ts", "*.tsx", "*.jsx"])
         if rc == 0:
+            spec_re = re.compile(r"""["'`]([^"'`]+)["'`]""")
             for line in out.splitlines():
-                if not line.startswith(p + ":"):
-                    orphans.append(line)
-    if orphans:
-        print("   ATTENTION : %d référence(s) orpheline(s) vers des modules supprimés"
-              % len(orphans))
-        print("      (le build/les tests révéleront le reste ; corriger le câblage)")
-        for line in orphans[:15]:
-            print("      %s" % line[:150])
+                path, _sep, rest = line.partition(":")
+                if path in ("".join(removed_paths),) or path in set(removed_paths):
+                    continue
+                for spec in spec_re.findall(rest):
+                    stem = Path(spec).stem
+                    if stem in stems:
+                        referrers.setdefault(path, set()).add(stem)
+
+    if referrers:
+        total_refs = sum(len(v) for v in referrers.values())
+        print("   ATTENTION : %d fichier(s) survivant(s) pointent encore vers un module supprimé"
+              % len(referrers))
+        print("      soit %d référence(s) de module à retirer du câblage (le build en révélera d'autres) :"
+              % total_refs)
+        for path in sorted(referrers, key=lambda k: (-len(referrers[k]), k))[:40]:
+            mods = sorted(referrers[path])
+            print("      %-52s %2d module(s) : %s"
+                  % (path, len(mods), ", ".join(mods[:4]) + ("…" if len(mods) > 4 else "")))
     else:
-        print("   OK : aucune référence orpheline détectée vers les modules supprimés")
+        print("   OK : aucune référence orpheline de module détectée")
 
     # alertes non destructives sur les motifs
     tracked = [l for l in git(repo, "ls-files").splitlines() if l.strip()]
