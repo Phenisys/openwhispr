@@ -67,9 +67,31 @@ if [ -f .nvmrc ]; then
   if [ -n "$HAVE" ] && [ "$HAVE" != "$WANT" ]; then
     echo "ATTENTION : Node $HAVE détecté, .nvmrc demande $WANT." >&2
     echo "            Un npm ci hors Node $WANT casse le lockfile et l'ABI better-sqlite3." >&2
-    echo "            Utilisez : nvm exec $WANT <commande>" >&2
+  fi
+  # Résolution de la bonne version : nvm chargé, sinon installation nvm directe,
+  # sinon PATH. Évite un faux échec de tests (ABI better-sqlite3) et un lockfile
+  # régénéré avec le mauvais majeur, même quand nvm n'est pas chargé dans le shell.
+  NODE_BIN=""
+  if command -v nvm >/dev/null 2>&1; then
+    NODE_BIN=""
+    NVM_MODE=1
+  else
+    NVM_MODE=0
+    for d in "${NVM_DIR:-$HOME/.nvm}/versions/node/v$WANT"* ; do
+      if [ -x "$d/bin/npm" ]; then NODE_BIN="$d/bin"; break; fi
+    done
   fi
 fi
+
+run_with_node() {
+  if [ "${NVM_MODE:-0}" = "1" ]; then
+    nvm exec "$(tr -d 'v \n' < .nvmrc)" "$@"
+  elif [ -n "${NODE_BIN:-}" ]; then
+    PATH="$NODE_BIN:$PATH" "$@"
+  else
+    "$@"
+  fi
+}
 
 if ! git rev-parse -q --verify "refs/tags/$LOCAL_REF" >/dev/null; then
   echo "-- récupération du tag officiel (sans ajouter de remote permanent) --"
@@ -117,16 +139,17 @@ esac
 
 if [ "$VERIFY" = "1" ]; then
   echo
-  echo "-- vérifications (Node 24) --"
-  if command -v nvm >/dev/null 2>&1; then
-    nvm exec "$(tr -d 'v \n' < .nvmrc)" npm ci
-    nvm exec "$(tr -d 'v \n' < .nvmrc)" npm test
-    nvm exec "$(tr -d 'v \n' < .nvmrc)" npm run lint
-    nvm exec "$(tr -d 'v \n' < .nvmrc)" npm run typecheck
-    nvm exec "$(tr -d 'v \n' < .nvmrc)" npm run build:renderer
-  else
-    echo "nvm introuvable : lancer manuellement, en Node $(tr -d 'v \n' < .nvmrc) :" >&2
+  echo "-- vérifications (Node $(tr -d 'v \n' < .nvmrc)) --"
+  if [ "${NVM_MODE:-0}" != "1" ] && [ -z "${NODE_BIN:-}" ]; then
+    echo "Node $(tr -d 'v \n' < .nvmrc) introuvable (nvm non chargé, aucune installation locale) :" >&2
+    echo "  lancer manuellement en Node $(tr -d 'v \n' < .nvmrc) :" >&2
     echo "  npm ci && npm test && npm run lint && npm run typecheck && npm run build:renderer" >&2
+  else
+    run_with_node npm ci
+    run_with_node npm test
+    run_with_node npm run lint
+    run_with_node npm run typecheck
+    run_with_node npm run build:renderer
   fi
 fi
 
