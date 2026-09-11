@@ -1,0 +1,219 @@
+# Manifeste d'exclusion Phenisys — appliqué à chaque fusion amont.
+#
+# Rôle : après un `git merge <tag-upstream>`, ces chemins sont supprimés
+# automatiquement (scripts/upstream_merge_resolve.py), puis une assertion
+# vérifie qu'aucun ne subsiste. C'est la forme MÉCANIQUE de la divergence du
+# fork : la politique BYOK / local / self-hosted (pas de couche
+# compte/login/cloud/workspace/billing/sync/MS-Calendar/enterprise).
+#
+# [purged]    Liste AUTORITAIRE des chemins que le fork a supprimés et
+#             maintient supprimés. Régénérable :
+#               git diff --name-status 1866ecf6..origin/main | awk '$1=="D"{print $2}'
+# [excluded]  Fichiers de la couche exclue arrivés avec l'amont (donc sans
+#             conflit : ils s'ajouteraient silencieusement). Liste vérifiée
+#             fichier par fichier pour la fenêtre de fusion courante.
+# [warn]      Motifs d'ALERTE, non destructifs. Le script signale tout fichier
+#             correspondant qui n'est ni dans [purged] ni dans [excluded] :
+#             un nouveau fichier de la couche exclue apparu dans une version
+#             suivante est ainsi repéré, mais rien n'est supprimé sans relecture.
+#             Ces motifs ont été validés sans faux positif sur l'arbre v1.10.0.
+#
+# Ajouter un chemin ici = décider d'exclure de la couche officielle. À traiter
+# comme du code : relu, versionné, et cité dans le PV de la fusion.
+[purged]  # 117 chemins
+src/components/AcceptInvitationModal.tsx
+src/components/ApiKeysSection.tsx
+src/components/AuthenticationStep.tsx
+src/components/CreateTeamDialog.tsx
+src/components/CreateWorkspaceDialog.tsx
+src/components/EmailVerificationStep.tsx
+src/components/ForgotPasswordView.tsx
+src/components/InviteTeammateDialog.tsx
+src/components/McpIntegrationCard.tsx
+src/components/MemberAvatar.tsx
+src/components/MemberPickList.tsx
+src/components/PostMigrationOnboarding.tsx
+src/components/ReferralDashboard.tsx
+src/components/ReferralModal.tsx
+src/components/SignInDialog.tsx
+src/components/TeamRosterSection.tsx
+src/components/UpgradePrompt.tsx
+src/components/notes/CreateSpaceDialog.tsx
+src/components/notes/DeleteSpaceDialog.tsx
+src/components/notes/RealtimeTranscriptionBanner.tsx
+src/components/notes/ShareNoteDialog.tsx
+src/components/notes/ShareVisibilityMenu.tsx
+src/components/notes/SpaceMembersDialog.tsx
+src/components/notes/SpaceSyncToastListener.tsx
+src/components/notes/SpacesTree.tsx
+src/components/referral-cards/SpectrogramCard.tsx
+src/components/referral-cards/generateWaveform.ts
+src/components/settings/ProfileSection.tsx
+src/components/settings/TeamMembersDialog.tsx
+src/components/settings/WorkspaceBillingCard.tsx
+src/components/settings/WorkspaceBillingOverview.tsx
+src/components/settings/WorkspaceDeveloperTab.tsx
+src/components/settings/WorkspaceMembersTab.tsx
+src/components/settings/WorkspaceSection.tsx
+src/components/settings/WorkspaceTeamsTab.tsx
+src/helpers/cloudSyncGuards.js
+src/hooks/useAuth.ts
+src/hooks/useBillingPortal.ts
+src/hooks/useSpaceRoster.ts
+src/hooks/useStartOnboarding.ts
+src/hooks/useTeamSpacesCapability.ts
+src/hooks/useUsage.ts
+src/hooks/useWorkspace.ts
+src/lib/auth.ts
+src/lib/authAccountScope.ts
+src/lib/authRequestContext.ts
+src/lib/billingPortalError.ts
+src/lib/memberCandidates.ts
+src/lib/spacePermissions.ts
+src/lib/spaceRosterCache.ts
+src/lib/subscriptionFlag.ts
+src/lib/teamSpacesCapability.ts
+src/lib/upsell.ts
+src/lib/usageStore.ts
+src/lib/workspaceSelection.ts
+src/services/ApiKeysService.ts
+src/services/ConversationsService.ts
+src/services/DictionaryService.ts
+src/services/FoldersService.ts
+src/services/InvitationsService.ts
+src/services/NoteSharingService.ts
+src/services/NotesService.ts
+src/services/SnippetService.ts
+src/services/SpacesService.ts
+src/services/SyncService.ts
+src/services/TeamsService.ts
+src/services/TranscriptionsService.ts
+src/services/WorkspaceApiKeysService.ts
+src/services/WorkspacesService.ts
+src/services/accountSpaceValidation.ts
+src/services/ai/inferenceProviders/corti.ts
+src/services/ai/inferenceProviders/openwhispr.ts
+src/services/cloudApi.ts
+src/services/noteCreateAck.ts
+src/services/spaceActions.ts
+src/services/spaceActionsCore.ts
+src/services/syncPassPolicy.ts
+src/stores/streamingProvidersStore.ts
+src/stores/workspaceStore.ts
+src/utils/billingSeatIntent.ts
+src/utils/pendingInvitationToken.ts
+test/helpers/assemblyAiStreaming.test.js
+test/helpers/audioManagerCloudFallbackPolicy.test.js
+test/helpers/cloudApiRequest.test.js
+test/helpers/cloudChunkPolicy.test.js
+test/helpers/cloudConfigRequest.test.js
+test/helpers/cloudSyncGuards.test.js
+test/helpers/harness/fakeCloud.js
+test/helpers/markNoteSyncedGuard.test.js
+test/helpers/noteCloudUpsertGuard.test.js
+test/helpers/openaiRealtimeStreaming.test.js
+test/helpers/preloadAuthBridge.test.js
+test/helpers/spacesDatabase.test.js
+test/helpers/streamingProvidersStore.test.js
+test/helpers/syncDeleteGuards.test.js
+test/helpers/syncHarness.test.js
+test/helpers/syncScenarios.test.js
+test/helpers/syncServiceConversations.test.js
+test/helpers/syncServiceFolders.test.js
+test/helpers/syncServiceNotes.test.js
+test/helpers/workspacePolicyCache.test.js
+test/helpers/workspacePolicyManager.test.js
+test/lib/authAccountScope.test.js
+test/lib/authRequestContext.test.js
+test/lib/billingPortalError.test.js
+test/lib/memberCandidates.test.js
+test/lib/spacePermissions.test.js
+test/lib/upsell.test.js
+test/lib/usageStore.test.js
+test/lib/workspaceSelection.test.js
+test/services/accountSpaceValidation.test.js
+test/services/noteCreateAck.test.js
+test/services/openwhisprReasonPurpose.test.js
+test/services/spaceActions.test.js
+test/services/syncPassPolicy.test.js
+test/services/teamRosterCache.test.js
+test/utils/billingSeatIntent.test.js
+
+[excluded]  # 62 fichiers amont exclus (arrivés sans conflit)
+src/assets/icons/microsoft-calendar.svg
+src/assets/icons/microsoft-calendar.webp
+src/components/CompactAuthenticationFlow.tsx
+src/components/LeaderboardAcceptInvitePreview.tsx
+src/components/LeaderboardSignInPreview.tsx
+src/components/LeaderboardWorkspaceNudge.tsx
+src/components/ReauthenticationScreen.tsx
+src/components/settings/EnterpriseCheckoutDialog.tsx
+src/components/settings/EnterpriseConsoleRow.tsx
+src/config/retiredCloudModels.ts
+src/helpers/accountScopeBinding.js
+src/helpers/enterpriseIdentityManager.js
+src/helpers/enterpriseManagedConfig.mjs
+src/helpers/managedTranscriptionExecutor.js
+src/helpers/microsoftCalendarManager.js
+src/helpers/microsoftCalendarOAuth.js
+src/helpers/oauthLoopbackFlow.js
+src/hooks/useBillingRefreshOnReturn.ts
+src/hooks/useInsightsSyncOptIn.tsx
+src/hooks/useJoinableWorkspaces.ts
+src/lib/accountDeletionFlow.ts
+src/lib/accountDeletionRequest.ts
+src/lib/accountScopeMirror.ts
+src/lib/emailAuthDiscovery.ts
+src/lib/workspaceBilling.ts
+src/services/EnterpriseIdentityService.ts
+src/services/managedTranscription.ts
+src/services/membershipActions.ts
+src/stores/enterpriseIdentityStore.ts
+src/types/enterpriseIdentity.ts
+test/components/authenticationStep.test.js
+test/components/compactAuthenticationFlow.test.js
+test/components/memberPickList.test.js
+test/helpers/accountOwnershipDatabase.test.js
+test/helpers/accountScopeBinding.test.js
+test/helpers/accountScopeIpc.test.js
+test/helpers/accountScopeRestoreContract.test.js
+test/helpers/bedrockEnterpriseIpc.test.js
+test/helpers/cortiAuth.test.js
+test/helpers/enterpriseAiProviders.test.js
+test/helpers/enterpriseAiProvidersAzureHosts.test.js
+test/helpers/enterpriseEndpointGuard.test.js
+test/helpers/enterpriseIdentityManager.test.js
+test/helpers/enterpriseManagedConfig.test.js
+test/helpers/managedTranscriptionExecutor.test.js
+test/helpers/microsoftCalendarManager.test.js
+test/helpers/oauthLoopbackFlow.test.js
+test/helpers/retiredCloudModels.test.js
+test/hooks/insightsSyncOptIn.test.js
+test/lib/accountDeletionFlow.test.js
+test/lib/accountScopeMirror.test.js
+test/lib/authDeleteAccount.test.js
+test/lib/emailAuthDiscovery.test.js
+test/lib/workspaceBilling.test.js
+test/services/analyticsPassAccountingContract.test.js
+test/services/enterpriseInferenceErrors.test.js
+test/services/fileTranscriptionManaged.test.js
+test/services/managedEnterpriseRouting.test.js
+test/services/workspacesServiceBilling.test.js
+test/stores/enterpriseIdentityStoreEnforcement.test.js
+test/stores/enterpriseIdentityStoreImports.test.js
+test/utils/managedAzureTranscriptionUrl.test.js
+
+[warn]
+*account*
+*billing*
+*subscription*
+*managed*
+*microsoft*
+*membership*
+*joinable*
+*deletion*
+*retiredcloud*
+*invite*
+*teammate*
+*member*
+*signin*
