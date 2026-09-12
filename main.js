@@ -288,7 +288,6 @@ const WhisperVulkanManager = require("./src/helpers/whisperVulkanManager");
 const { migrateLegacyBinDir, detectOrphanedGpuPacks } = require("./src/helpers/gpuBinaryManager");
 const { resetWhisperGpuFailureOnUpgrade } = require("./src/helpers/whisperGpuUpgradeReset");
 const GoogleCalendarManager = require("./src/helpers/googleCalendarManager");
-const MicrosoftCalendarManager = require("./src/helpers/microsoftCalendarManager");
 const AppleCalendarManager = require("./src/helpers/appleCalendarManager");
 const CalendarReminderScheduler = require("./src/helpers/calendarReminderScheduler");
 const MeetingProcessDetector = require("./src/helpers/meetingProcessDetector");
@@ -328,7 +327,6 @@ let selectionManager = null;
 let whisperCudaManager = null;
 let whisperVulkanManager = null;
 let googleCalendarManager = null;
-let microsoftCalendarManager = null;
 let appleCalendarManager = null;
 let calendarReminderScheduler = null;
 let meetingDetectionEngine = null;
@@ -434,16 +432,6 @@ function initializeCoreManagers() {
   windowManager = new WindowManager();
   hotkeyManager = windowManager.hotkeyManager;
   databaseManager = new DatabaseManager();
-  // Restore the last validated account scope before any window, IPC handler,
-  // or meeting flow can read or create notes. Offline launches keep the
-  // account's data visible; a stale or rotated credential fails the hash
-  // check and restores nothing.
-  const accountScopeBinding = require("./src/helpers/accountScopeBinding");
-  const bootAccountId = accountScopeBinding.resolveBootAccountScope({
-    token: require("./src/helpers/tokenStore").get(),
-    binding: accountScopeBinding.read(),
-  });
-  if (bootAccountId) databaseManager.setActiveAccountId(bootAccountId);
   clipboardManager = new ClipboardManager();
   whisperManager = new WhisperManager();
   if (process.platform !== "darwin") {
@@ -484,10 +472,6 @@ function initializeCoreManagers() {
   googleCalendarManager = new GoogleCalendarManager(
     databaseManager,
     windowManager,
-    calendarReminderScheduler
-  );
-  microsoftCalendarManager = new MicrosoftCalendarManager(
-    databaseManager,
     calendarReminderScheduler
   );
   appleCalendarManager = new AppleCalendarManager(databaseManager, calendarReminderScheduler);
@@ -549,7 +533,6 @@ function initializeCoreManagers() {
     whisperCudaManager,
     whisperVulkanManager,
     googleCalendarManager,
-    microsoftCalendarManager,
     appleCalendarManager,
     meetingDetectionEngine,
     audioTapManager,
@@ -621,7 +604,6 @@ function initializeDeferredManagers() {
   }
 
   googleCalendarManager.start();
-  microsoftCalendarManager.start();
   appleCalendarManager.start();
   meetingDetectionEngine.start();
 }
@@ -1213,7 +1195,6 @@ async function startApp() {
 
   app.on("browser-window-focus", () => {
     if (googleCalendarManager) googleCalendarManager.syncOnFocus();
-    if (microsoftCalendarManager) microsoftCalendarManager.syncOnFocus();
     if (appleCalendarManager) appleCalendarManager.syncOnFocus();
   });
 
@@ -1223,7 +1204,6 @@ async function startApp() {
     if (googleCalendarManager) {
       googleCalendarManager.onWakeFromSleep();
     }
-    if (microsoftCalendarManager) microsoftCalendarManager.onWakeFromSleep();
     if (appleCalendarManager) appleCalendarManager.onWakeFromSleep();
     // Sleep evicts the local GPU model from VRAM; reload it once the driver settles. See #766.
     if (wakeRewarmTimer) clearTimeout(wakeRewarmTimer);
@@ -1797,19 +1777,8 @@ async function startApp() {
   }
 }
 
-ipcMain.on("mac-accessibility-features-ready", (_event, expectedAccountScope) => {
+ipcMain.on("mac-accessibility-features-ready", (_event) => {
   if (process.platform !== "darwin") return;
-  if (expectedAccountScope) {
-    const accountScopeBinding = require("./src/helpers/accountScopeBinding");
-    const currentAccountScope = accountScopeBinding.resolveActiveAccountScope({
-      ...require("./src/helpers/tokenStore").getState(),
-      binding: accountScopeBinding.read(),
-    });
-    if (!accountScopeBinding.matchesActiveAccountScope(expectedAccountScope, currentAccountScope)) {
-      debugLogger.info("[Accessibility] Ignoring stale account-scoped readiness signal");
-      return;
-    }
-  }
   macAccessibilityFeaturesReady = true;
   startMacAccessibilityFeatures?.();
 });
@@ -1995,7 +1964,6 @@ function performSyncTeardown() {
   if (linuxKeyManager) linuxKeyManager.stop();
   if (meetingDetectionEngine) meetingDetectionEngine.stop();
   if (googleCalendarManager) googleCalendarManager.stop();
-  if (microsoftCalendarManager) microsoftCalendarManager.stop();
   if (appleCalendarManager) appleCalendarManager.stop();
   if (calendarReminderScheduler) calendarReminderScheduler.stop();
   if (audioTapManager) audioTapManager.stop().catch(() => {});

@@ -12,15 +12,12 @@ const { openExternalUrl } = require("./externalUrlOpener");
 const { resolveFailedGpuBackends } = require("./whisper");
 const { BYOK_API_KEYS } = require("../config/secretKeys");
 const tokenStore = require("./tokenStore");
-const accountScopeBinding = require("./accountScopeBinding");
 const { createCloudApiRequestHandler } = require("./cloudApiRequest");
-const { decodeLeaderboardPngDataUrl, leaderboardImageFilename } = require("./leaderboardImage");
 const { withPolicyRequestHeaders } = require("./policyRequestHeaders");
 const {
   createWorkspacePolicyManager,
   isScreenContextBlocked,
 } = require("./workspacePolicyManager");
-const { createEnterpriseIdentityManager } = require("./enterpriseIdentityManager");
 const { createCloudConfigRequestHandler } = require("./cloudConfigRequest");
 const { extractAnthropicText, describeMissingAnthropicText } = require("./anthropicResponse");
 const {
@@ -610,7 +607,6 @@ class IPCHandlers {
     this.whisperCudaManager = managers.whisperCudaManager;
     this.whisperVulkanManager = managers.whisperVulkanManager;
     this.googleCalendarManager = managers.googleCalendarManager;
-    this.microsoftCalendarManager = managers.microsoftCalendarManager;
     this.appleCalendarManager = managers.appleCalendarManager;
     this.meetingDetectionEngine = managers.meetingDetectionEngine;
     this.audioTapManager = managers.audioTapManager;
@@ -671,12 +667,6 @@ class IPCHandlers {
     this.setupHandlers();
     // Lives for the app's lifetime; IPCHandlers has no teardown path.
     tokenStore.subscribe(({ generation, token }) => {
-      this.enterpriseIdentityManager?.clear();
-      if (!token) {
-        this.databaseManager.setActiveAccountId(null);
-        accountScopeBinding.clear();
-        broadcastToWindows("active-account-scope-changed", null);
-      }
       broadcastToWindows("auth-token-state-changed", {
         generation,
         hasToken: Boolean(token),
@@ -714,22 +704,12 @@ class IPCHandlers {
     return this._retentionSettingsSynced && this._retentionSettings.dataRetentionEnabled;
   }
 
-  /** Whether a signed-in account is bound to this install. */
-  _hasActiveAccountScope() {
-    return Boolean(accountScopeBinding.read());
-  }
-
-  // The switch alone is not enough to start: a managed workspace can force local
-  // history off, and that policy arrives over the network while this scan takes
-  // milliseconds, so the renderer reports the permissive personal default until
-  // it lands. Waiting for the real answer is only possible where there is one --
-  // signed out the policy store stays idle forever and the user's own preference
-  // is the only authority there is. Mid-scan arrival needs no separate check:
-  // a policy that resolves "always_off" flips the switch, which the loop reads.
+  // The switch alone is not enough to start: the renderer reports the
+  // permissive personal default until its first sync lands. This build has no
+  // account layer, so no workspace policy can arrive to force local history
+  // off: once the retention switch is synced and on, the scan may start.
   _mayStartAnalyticsHistoryReconstruction() {
-    if (!this._canReconstructAnalyticsHistory()) return false;
-    if (this._retentionSettings.localHistoryPolicyResolved === true) return true;
-    return !this._hasActiveAccountScope();
+    return this._canReconstructAnalyticsHistory();
   }
 
   // Reconciliation is best-effort. Analytics reads await it so later-eligible
@@ -2231,41 +2211,6 @@ class IPCHandlers {
       return this.databaseManager.getSpaces();
     });
 
-    ipcMain.handle("set-active-account-scope", async (_event, accountId, expectedGeneration) => {
-      const state = tokenStore.getState();
-      const verdict = accountScopeBinding.evaluateScopeRequest({
-        accountId,
-        expectedGeneration,
-        token: state.token,
-        generation: state.generation,
-      });
-      if (!verdict.ok) {
-        return {
-          success: false,
-          code: verdict.code,
-          error:
-            verdict.code === "INVALID_ACCOUNT"
-              ? "Invalid account scope"
-              : "Authentication context changed before account scoping",
-        };
-      }
-      this.databaseManager.setActiveAccountId(accountId);
-      if (accountId !== null) accountScopeBinding.persist(accountId, state.token);
-      else accountScopeBinding.clear();
-      broadcastToWindows(
-        "active-account-scope-changed",
-        accountId !== null ? { accountId, authGeneration: state.generation } : null
-      );
-      return { success: true };
-    });
-
-    ipcMain.handle("get-active-account-scope", () =>
-      accountScopeBinding.resolveActiveAccountScope({
-        ...tokenStore.getState(),
-        binding: accountScopeBinding.read(),
-      })
-    );
-
     ipcMain.handle("delete-account-data", async (_event, accountId, expectedGeneration) => {
       const state = tokenStore.getState();
       if (
@@ -3106,47 +3051,6 @@ class IPCHandlers {
       return this.clipboardManager.writeClipboard(text, event.sender);
     });
 
-    ipcMain.handle("leaderboard-copy-image", async (_event, dataUrl) => {
-      try {
-        const { clipboard, nativeImage } = require("electron");
-        const image = nativeImage.createFromBuffer(decodeLeaderboardPngDataUrl(dataUrl));
-        if (image.isEmpty()) throw new Error("Leaderboard image could not be decoded");
-        clipboard.writeImage(image);
-        return { success: true };
-      } catch (error) {
-        debugLogger.error(
-          "Failed to copy leaderboard image",
-          { error: error.message },
-          "analytics"
-        );
-        return { success: false, error: error.message };
-      }
-    });
-
-    ipcMain.handle("leaderboard-save-image", async (event, dataUrl, suggestedName) => {
-      try {
-        const { dialog } = require("electron");
-        const parentWindow = BrowserWindow.fromWebContents(event.sender);
-        const options = {
-          defaultPath: leaderboardImageFilename(suggestedName),
-          filters: [{ name: "PNG image", extensions: ["png"] }],
-        };
-        const result = parentWindow
-          ? await dialog.showSaveDialog(parentWindow, options)
-          : await dialog.showSaveDialog(options);
-        if (result.canceled || !result.filePath) return { success: true, canceled: true };
-        await fs.promises.writeFile(result.filePath, decodeLeaderboardPngDataUrl(dataUrl));
-        return { success: true, canceled: false };
-      } catch (error) {
-        debugLogger.error(
-          "Failed to save leaderboard image",
-          { error: error.message },
-          "analytics"
-        );
-        return { success: false, error: error.message };
-      }
-    });
-
     ipcMain.handle("check-paste-tools", async () => {
       return this.clipboardManager.checkPasteTools();
     });
@@ -3888,11 +3792,6 @@ class IPCHandlers {
         errors.push(`GCal stop: ${e.message}`);
       }
       try {
-        this.microsoftCalendarManager?.stop();
-      } catch (e) {
-        errors.push(`MCal stop: ${e.message}`);
-      }
-      try {
         this.appleCalendarManager?.stop();
       } catch (e) {
         errors.push(`ACal stop: ${e.message}`);
@@ -3997,17 +3896,10 @@ class IPCHandlers {
         errors.push(`Authentication token: ${e.message}`);
       }
       try {
-        this.enterpriseIdentityManager?.clear();
-      } catch (e) {
-        errors.push(`Enterprise settings: ${e.message}`);
-      }
-      try {
         for (const fileName of [
           "workspace-policy.json",
-          "managed-enterprise-config.json",
           "globe-preference-state.json",
           ".system-audio-permission",
-          "account-scope-binding.json",
         ]) {
           fs.rmSync(path.join(app.getPath("userData"), fileName), { force: true });
         }
@@ -6003,15 +5895,6 @@ class IPCHandlers {
       broadcast: (snapshot) => broadcastToWindows("workspace-policy-changed", snapshot),
       logger: debugLogger,
     });
-    this.enterpriseIdentityManager = createEnterpriseIdentityManager({
-      cachePath: path.join(app.getPath("userData"), "managed-enterprise-config.json"),
-      getApiUrl,
-      getAppVersion: () => app.getVersion(),
-      proxyFetch,
-      tokenStore,
-      broadcast: (snapshot) => broadcastToWindows("managed-enterprise-config-changed", snapshot),
-      logger: debugLogger,
-    });
     const resolveEnterpriseRuntime = async (event, provider, model, config = {}) => {
       const manual = {
         provider,
@@ -6019,84 +5902,8 @@ class IPCHandlers {
         apiKey: config.apiKey || "",
         enterprise: require("./enterpriseProviderErrors").pickEnterpriseConfig(config),
       };
-      const context = config.managedContext;
-      if (!context) return manual;
-      const authHeaders = await getAuthHeader(event);
-      const resolved = await this.enterpriseIdentityManager.resolveProvider({
-        accountId: context.accountId,
-        workspaceId: context.workspaceId,
-        expectedAuthGeneration: context.authGeneration,
-        inferenceScope: context.inferenceScope,
-        setupMode: context.setupMode,
-        authHeaders,
-      });
-      if (!resolved.managed) {
-        throw Object.assign(
-          new Error("Managed enterprise configuration changed. Retry the request."),
-          { code: "MANAGED_CONFIG_CHANGED" }
-        );
-      }
-      if (
-        resolved.provider !== context.provider ||
-        resolved.generation !== context.generation ||
-        resolved.version !== context.providerVersion
-      ) {
-        throw Object.assign(
-          new Error("Managed enterprise configuration changed. Retry the request."),
-          { code: "MANAGED_CONFIG_CHANGED" }
-        );
-      }
-      if (resolved.provider === "bedrock") {
-        return {
-          provider: resolved.provider,
-          model: resolved.model,
-          apiKey: "",
-          enterprise: {
-            bedrockRegion: resolved.config.region,
-            managedCredentialProvider: resolved.credentialProvider,
-          },
-        };
-      }
-      return {
-        provider: resolved.provider,
-        model: resolved.model,
-        apiKey: "",
-        enterprise: {
-          azureEndpoint: resolved.config.endpoint,
-          azureApiVersion: resolved.config.apiVersion,
-          managedTokenProvider: resolved.tokenProvider,
-        },
-      };
+      return manual;
     };
-    const { createManagedTranscriptionExecutor } = require("./managedTranscriptionExecutor");
-    const executeManagedTranscription = createManagedTranscriptionExecutor({
-      resolveEnterpriseRuntime,
-      proxyFetch,
-      buildUrl: async (endpoint, deployment, apiVersion) => {
-        const { buildManagedAzureTranscriptionUrl } = await import("../utils/urlUtils.ts");
-        return buildManagedAzureTranscriptionUrl(endpoint, deployment, apiVersion);
-      },
-    });
-    this.executeManagedTranscription = executeManagedTranscription;
-
-    ipcMain.handle(
-      "managed-transcribe",
-      serializeIpcError(
-        async (event, { audioBuffer, fileName, mimeType, language, prompt, managed }) => {
-          const text = await executeManagedTranscription(
-            event,
-            { provider: managed.provider, context: managed.context, language },
-            {
-              audioBuffer: Buffer.from(audioBuffer),
-              fileName: fileName || "audio.webm",
-              contentType: mimeType || "audio/webm",
-              prompt,
-            }
-          );
-          return { text };
-        }
-      )
-    );
     const handleSttConfigRequest = createCloudConfigRequestHandler({
       getApiUrl,
       getAuthHeader,
@@ -6272,7 +6079,6 @@ class IPCHandlers {
         const route = resolveTranscriptionRoute({
           settings: settings || {},
           providers: transcriptionProviderBaseUrls(),
-          managed: settings?.managed,
           request: { effectiveLanguage: language },
         });
 
@@ -6289,14 +6095,7 @@ class IPCHandlers {
           throw err;
         }
 
-        if (route.transport === "managed") {
-          const text = await this.executeManagedTranscription(event, route, {
-            audioBuffer: buffer,
-            fileName: "audio.webm",
-            contentType: "audio/webm",
-          });
-          result = { text, source: "azure-managed", model: route.deployment };
-        } else if (route.transport === "http-batch" && route.provider === "self-hosted") {
+        if (route.transport === "http-batch" && route.provider === "self-hosted") {
           const formData = new FormData();
           formData.append("file", new Blob([buffer], { type: "audio/webm" }), "audio.webm");
           if (route.model) {
@@ -9662,23 +9461,6 @@ class IPCHandlers {
       return workspacePolicyManager.getPolicy({ accountId, expectedAuthGeneration, authHeaders });
     });
 
-    ipcMain.handle(
-      "get-managed-enterprise-config",
-      async (event, accountId, workspaceId, expectedAuthGeneration, forceRefresh = false) => {
-        const authHeaders = await getAuthHeader(event);
-        return this.enterpriseIdentityManager.getConfig({
-          accountId,
-          workspaceId,
-          expectedAuthGeneration,
-          authHeaders,
-          forceRefresh,
-        });
-      }
-    );
-    ipcMain.handle("clear-managed-enterprise-identity", async () => {
-      this.enterpriseIdentityManager.clear();
-    });
-
     ipcMain.handle("get-note-recording-config", handleNoteRecordingConfigRequest);
 
     ipcMain.handle("transcribe-audio-file-cloud", async (event, filePath, opts = {}) => {
@@ -9821,19 +9603,6 @@ class IPCHandlers {
               code: route.code,
               messageKey: route.messageKey,
             };
-          }
-
-          if (route.transport === "managed") {
-            if (fs.statSync(realByok).size > route.sizeCapBytes) {
-              return { success: false, error: byokSizeCapError(route.sizeCapBytes) };
-            }
-            const ext = path.extname(realByok).toLowerCase().replace(".", "");
-            const text = await this.executeManagedTranscription(event, route, {
-              audioBuffer: fs.readFileSync(realByok),
-              fileName: path.basename(realByok),
-              contentType: AUDIO_MIME_TYPES[ext] || "audio/mpeg",
-            });
-            return { success: true, text };
           }
 
           if (route.transport === "http-batch" && route.provider === "self-hosted") {
@@ -11156,7 +10925,6 @@ class IPCHandlers {
             databaseManager: this.databaseManager,
             calendarProviders: [
               { provider: "google", manager: this.googleCalendarManager },
-              { provider: "microsoft", manager: this.microsoftCalendarManager },
               { provider: "apple", manager: this.appleCalendarManager },
             ],
           }),
@@ -11258,52 +11026,6 @@ class IPCHandlers {
         return { success: true, event };
       } catch (error) {
         return { success: false, event: null };
-      }
-    });
-
-    // Microsoft Calendar
-    ipcMain.handle("mcal-start-oauth", async () => {
-      try {
-        return await this.microsoftCalendarManager.startOAuth();
-      } catch (error) {
-        debugLogger.error("Microsoft Calendar OAuth failed", { error: error.message }, "calendar");
-        return { success: false, error: error.message };
-      }
-    });
-
-    ipcMain.handle("mcal-disconnect", async (_event, email) => {
-      try {
-        this.microsoftCalendarManager.disconnect(email);
-        return { success: true };
-      } catch (error) {
-        debugLogger.error(
-          "Microsoft Calendar disconnect failed",
-          { error: error.message },
-          "calendar"
-        );
-        return { success: false, error: error.message };
-      }
-    });
-
-    ipcMain.handle("mcal-get-connection-status", async () => {
-      try {
-        return this.microsoftCalendarManager.getConnectionStatus();
-      } catch (error) {
-        debugLogger.error(
-          "Microsoft Calendar connection status failed",
-          { error: error.message },
-          "calendar"
-        );
-        return { connected: false, accounts: [] };
-      }
-    });
-
-    ipcMain.handle("mcal-set-primary-only", async (_event, value) => {
-      try {
-        await this.microsoftCalendarManager.setPrimaryOnly(value);
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error.message };
       }
     });
 
