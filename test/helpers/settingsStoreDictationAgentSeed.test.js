@@ -47,9 +47,11 @@ test("the Voice Assistant scope is seeded from Chat once for profiles that never
     assert.equal(state.dictationAgentRemoteUrl, "https://llm.lan:8080/v1");
   });
 
+  // A persisted hosted-cloud value no longer exists in the fork; the store
+  // reads it as its BYOK fallback, and the seed must still leave it alone.
   await t.test("a Voice Assistant scope the user configured is left alone", async () => {
     const state = await load({ ...localChat, dictationAgentMode: "openwhispr" });
-    assert.equal(state.dictationAgentMode, "openwhispr");
+    assert.equal(state.dictationAgentMode, "providers");
     assert.equal(state.dictationAgentProvider, "");
     assert.equal(storage.getItem("_dictationAgentSeeded"), "1");
   });
@@ -60,23 +62,24 @@ test("the Voice Assistant scope is seeded from Chat once for profiles that never
       dictationAgentProvider: "groq",
       dictationAgentModel: "openai/gpt-oss-20b",
     });
-    assert.equal(state.dictationAgentMode, "openwhispr");
+    assert.equal(state.dictationAgentMode, "providers");
     assert.equal(state.dictationAgentProvider, "groq");
     assert.equal(state.dictationAgentModel, "openai/gpt-oss-20b");
   });
 
   // The provider-settings and agent-mode migrations leave a fresh profile's Chat
-  // scope on the cloud default, so the copy is a no-op in effect.
+  // scope on the legacy hosted-cloud value; the store reads that value back as
+  // its BYOK fallback, so the copy stays a no-op in effect.
   await t.test("a fresh profile inherits the same cloud default Chat was migrated to", async () => {
     const state = await load({});
     assert.equal(storage.getItem("chatAgentMode"), "openwhispr");
-    assert.equal(state.dictationAgentMode, "openwhispr");
+    assert.equal(state.dictationAgentMode, "providers");
     assert.equal(state.dictationAgentProvider, "");
   });
 
   await t.test("a seeded profile is not seeded again after Chat changes", async () => {
     const state = await load({ ...localChat, _dictationAgentSeeded: "1" });
-    assert.equal(state.dictationAgentMode, "openwhispr");
+    assert.equal(state.dictationAgentMode, "providers");
     assert.equal(storage.getItem("dictationAgentMode"), null);
   });
 });

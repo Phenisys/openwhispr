@@ -60,8 +60,8 @@ test("guest flow keeps permissions and the hotkey before setup choice", async ()
   const { getOnboardingRoute } = await load();
   // finalizeOnboarding registers the dictation hotkey on every path, so guests
   // must still grant the mic and see the key they are getting.
+  // The account step was purged, so every route starts on permissions.
   assert.deepEqual(getOnboardingRoute({ authPath: "guest", setupMode: null, agentAllowed: true }), [
-    "auth",
     "permissions",
     "dictation-hotkey",
     "setup-choice",
@@ -80,7 +80,7 @@ test("setup choice appends the selected two-stage route", async () => {
   const { getOnboardingRoute } = await load();
   assert.deepEqual(
     getOnboardingRoute({ authPath: "guest", setupMode: "byok", agentAllowed: true }),
-    ["auth", "permissions", "dictation-hotkey", "setup-choice", "byok-dictation", "byok-assistant"]
+    ["permissions", "dictation-hotkey", "setup-choice", "byok-dictation", "byok-assistant"]
   );
   assert.deepEqual(
     getOnboardingRoute({ authPath: "account", setupMode: "local", agentAllowed: false }).slice(-2),
@@ -305,7 +305,10 @@ test("an explicit restart clears every persisted route choice and returns to aut
 
 test("legacy numeric steps migrate conservatively", async () => {
   const { migrateLegacyOnboardingStep } = await load();
-  assert.equal(migrateLegacyOnboardingStep(null), "auth");
+  // The auth step no longer exists: an absent save resumes and the fork's
+  // onboarding opens on permissions. Index 0 still maps to the old auth slot,
+  // which the route reconciliation then clamps.
+  assert.equal(migrateLegacyOnboardingStep(null), "permissions");
   assert.equal(migrateLegacyOnboardingStep("0"), "auth");
   // Old steps 1-2 predate the old permissions step, so they must resume at
   // the new flow's permissions step rather than past it.

@@ -163,77 +163,6 @@ async function loadAudioManager(t) {
   };
 }
 
-test("cloud auto-language routing uses detected speech before the UI language", async (t) => {
-  const { window, setSettings, createManager } = await loadAudioManager(t);
-  const audioBlob = {
-    type: "audio/webm",
-    size: 1024,
-    arrayBuffer: async () => new ArrayBuffer(8),
-  };
-  const settings = {
-    preferredLanguage: "auto",
-    useCleanupModel: true,
-    cleanupCloudMode: "byok",
-    cleanupDisableThinking: false,
-    customDictionary: [],
-    snippets: [],
-  };
-
-  setSettings({ ...settings, uiLanguage: "it" });
-  window.electronAPI.cloudTranscribe = async () => ({
-    success: true,
-    text: "and then ehi Jarvis said something",
-    sttLanguage: "en",
-  });
-  const englishResult = await createManager().processWithOpenWhisprCloud(audioBlob);
-  assert.equal(englishResult.text, "cleanup output");
-
-  setSettings({ ...settings, uiLanguage: "en" });
-  window.electronAPI.cloudTranscribe = async () => ({
-    success: true,
-    text: "stavo pensando ehi Jarvis scrivi una mail",
-    sttLanguage: "it",
-  });
-  const italianResult = await createManager().processWithOpenWhisprCloud(audioBlob);
-  assert.equal(italianResult.text, "agent output");
-});
-
-test("cloud transcription returns the occurrence time sent with analytics", async (t) => {
-  const { window, setSettings, createManager } = await loadAudioManager(t);
-  const analyticsOccurredAt = "2026-09-02T14:00:00.000Z";
-  const audioBlob = {
-    type: "audio/webm",
-    size: 1024,
-    arrayBuffer: async () => new ArrayBuffer(8),
-  };
-  let requestOptions;
-
-  setSettings({
-    preferredLanguage: "auto",
-    useCleanupModel: false,
-    customDictionary: [],
-    snippets: [],
-    isSignedIn: true,
-    insightsSyncEnabled: true,
-    dataRetentionEnabled: true,
-  });
-  window.electronAPI.cloudTranscribe = async (_audio, options) => {
-    requestOptions = options;
-    return {
-      success: true,
-      text: "same event",
-      clientTranscriptionId: "event-1",
-    };
-  };
-
-  const result = await createManager().processWithOpenWhisprCloud(audioBlob, {
-    analyticsOccurredAt,
-  });
-
-  assert.equal(requestOptions.analyticsOccurredAt, analyticsOccurredAt);
-  assert.equal(result.analyticsOccurredAt, analyticsOccurredAt);
-});
-
 test("local analytics save uses the propagated occurrence time", async (t) => {
   const { window, setSettings, createManager } = await loadAudioManager(t);
   const analyticsOccurredAt = "2026-09-02T14:00:00.000Z";
@@ -256,35 +185,6 @@ test("local analytics save uses the propagated occurrence time", async (t) => {
   });
 
   assert.equal(recordedEvent.occurredAt, analyticsOccurredAt);
-});
-
-test("cloud auto-language stripping uses the same detected Arabic as routing", async (t) => {
-  const { window, setSettings, createBankingManager } = await loadAudioManager(t);
-  const audioBlob = {
-    type: "audio/webm",
-    size: 1024,
-    arrayBuffer: async () => new ArrayBuffer(8),
-  };
-  setSettings({
-    preferredLanguage: "auto",
-    uiLanguage: "en",
-    useCleanupModel: true,
-    cleanupCloudMode: "byok",
-    cleanupDisableThinking: false,
-    customDictionary: [],
-    snippets: [],
-  });
-  localStorage.setItem("agentName", "Max");
-  window.electronAPI.cloudTranscribe = async () => ({
-    success: true,
-    text: "يا Max، لخّص هذه الملاحظة",
-    sttLanguage: "ar",
-  });
-
-  const manager = createBankingManager();
-  await manager.processWithOpenWhisprCloud(audioBlob);
-
-  assert.equal(manager.pendingAssistantConversation?.transcript, "لخّص هذه الملاحظة");
 });
 
 test("generic auto-language routing infers Arabic before an English UI fallback", async (t) => {
