@@ -29,6 +29,12 @@ import { isCacheableMicrophoneResolution, resolvePreferredMicrophone } from "./m
 import { isStaleDeviceError } from "./staleMicDevice";
 import { shouldSaveDiscardedRecording } from "./discardedRecording";
 import {
+  ANALYTICS_COUNTER_VERSION,
+  countSpokenWords,
+  localDateKey,
+  resolveAnalyticsMode,
+} from "./analytics";
+import {
   getSettings,
   useSettingsStore,
   getEffectiveCleanupModel,
