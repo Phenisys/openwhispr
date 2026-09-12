@@ -3463,7 +3463,6 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           model,
           language,
           apiSettings,
-          managedResolution,
           mimeType: optimizedAudio.type || "audio/webm",
           dictionaryPrompt: this.getWhisperPrompt(apiSettings),
           keyterms: this.getKeyterms()
