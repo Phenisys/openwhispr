@@ -1395,6 +1395,7 @@
     "connectCalendarButton": "ربط التقويم"
   },
   "notes": {
+    "tree": { "structureIntroHint": "إظهار مساعدة الملاحظات" },
     "mutationErrors": {
       "folderNameRequired": "أدخل اسم مجلد.",
       "folderAlreadyExists": "يوجد مجلد بهذا الاسم بالفعل.",
@@ -1544,6 +1545,7 @@
       "reopen": "تعرف على كيفية تنظيم المساحات"
     },
     "folders": {
+      "create": "إنشاء مجلد",
       "defaults": {
         "personal": "شخصي",
         "meetings": "الاجتماعات",

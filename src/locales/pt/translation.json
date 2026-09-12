@@ -2746,6 +2746,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "Mostrar ajuda das notas" },
     "mutationErrors": {
       "folderNameRequired": "Insira um nome para a pasta.",
       "folderAlreadyExists": "Já existe uma pasta com esse nome.",
@@ -2883,6 +2884,7 @@
       "reopen": "Entenda como os espaços são organizados"
     },
     "folders": {
+      "create": "Criar pasta",
       "defaults": {
         "personal": "Pessoal",
         "meetings": "Reuniões",

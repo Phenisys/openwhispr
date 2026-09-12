@@ -2746,6 +2746,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "顯示筆記說明" },
     "mutationErrors": {
       "folderNameRequired": "請輸入資料夾名稱。",
       "folderAlreadyExists": "已存在同名資料夾。",
@@ -2883,6 +2884,7 @@
       "reopen": "瞭解空間的組織方式"
     },
     "folders": {
+      "create": "新增資料夾",
       "defaults": {
         "personal": "個人",
         "meetings": "會議",

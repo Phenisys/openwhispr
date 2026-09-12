@@ -2746,6 +2746,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "显示笔记帮助" },
     "mutationErrors": {
       "folderNameRequired": "请输入文件夹名称。",
       "folderAlreadyExists": "已存在同名文件夹。",
@@ -2883,6 +2884,7 @@
       "reopen": "了解空间的组织方式"
     },
     "folders": {
+      "create": "新建文件夹",
       "defaults": {
         "personal": "个人",
         "meetings": "会议",

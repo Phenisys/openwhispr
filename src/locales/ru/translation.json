@@ -2762,6 +2762,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "Показать справку по заметкам" },
     "mutationErrors": {
       "folderNameRequired": "Введите название папки.",
       "folderAlreadyExists": "Папка с таким названием уже существует.",
@@ -2905,6 +2906,7 @@
       "reopen": "Как организованы пространства"
     },
     "folders": {
+      "create": "Создать папку",
       "defaults": {
         "personal": "Личное",
         "meetings": "Встречи",

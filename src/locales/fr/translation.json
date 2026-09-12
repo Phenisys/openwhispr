@@ -3088,6 +3088,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "Afficher l'aide sur les notes" },
     "mutationErrors": {
       "folderNameRequired": "Saisissez un nom de dossier.",
       "folderAlreadyExists": "Un dossier portant ce nom existe déjà.",
@@ -3225,6 +3226,7 @@
       "reopen": "Comprendre l'organisation des espaces"
     },
     "folders": {
+      "create": "Créer un dossier",
       "defaults": {
         "personal": "Personnel",
         "meetings": "Réunions",

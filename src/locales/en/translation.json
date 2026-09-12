@@ -3088,6 +3088,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "Show notes help" },
     "mutationErrors": {
       "folderNameRequired": "Enter a folder name.",
       "folderAlreadyExists": "A folder with that name already exists.",
@@ -3225,6 +3226,7 @@
       "reopen": "Learn how spaces are organized"
     },
     "folders": {
+      "create": "Create folder",
       "defaults": {
         "personal": "Personal",
         "meetings": "Meetings",

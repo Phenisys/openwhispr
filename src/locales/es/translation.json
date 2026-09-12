@@ -2799,6 +2799,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "Mostrar ayuda de notas" },
     "mutationErrors": {
       "folderNameRequired": "Introduce un nombre para la carpeta.",
       "folderAlreadyExists": "Ya existe una carpeta con ese nombre.",
@@ -2936,6 +2937,7 @@
       "reopen": "Cómo se organizan los espacios"
     },
     "folders": {
+      "create": "Crear carpeta",
       "defaults": {
         "personal": "Personal",
         "meetings": "Reuniones",

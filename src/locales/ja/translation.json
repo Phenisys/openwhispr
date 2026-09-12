@@ -2674,6 +2674,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "ノートのヘルプを表示" },
     "mutationErrors": {
       "folderNameRequired": "フォルダ名を入力してください。",
       "folderAlreadyExists": "同じ名前のフォルダが既に存在します。",
@@ -2914,6 +2915,7 @@
       "noNotesAvailable": "他のノートはありません"
     },
     "folders": {
+      "create": "フォルダを作成",
       "defaults": {
         "personal": "個人",
         "meetings": "ミーティング",

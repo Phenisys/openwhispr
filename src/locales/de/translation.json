@@ -3088,6 +3088,7 @@
     }
   },
   "notes": {
+    "tree": { "structureIntroHint": "Hilfe zu Notizen anzeigen" },
     "mutationErrors": {
       "folderNameRequired": "Gib einen Ordnernamen ein.",
       "folderAlreadyExists": "Ein Ordner mit diesem Namen existiert bereits.",
@@ -3225,6 +3226,7 @@
       "reopen": "Organisation der Bereiche erklären"
     },
     "folders": {
+      "create": "Ordner erstellen",
       "defaults": {
         "personal": "Persönlich",
         "meetings": "Besprechungen",
