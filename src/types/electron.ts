@@ -1484,14 +1484,6 @@ declare global {
 
       // Space operations
       getSpaces?: () => Promise<SpaceItem[]>;
-      setActiveAccountScope?: (
-        accountId: string | null,
-        expectedAuthGeneration?: number
-      ) => Promise<{ success: boolean; code?: string; error?: string }>;
-      getActiveAccountScope?: () => Promise<ActiveAccountScope | null>;
-      onActiveAccountScopeChanged?: (
-        callback: (scope: ActiveAccountScope | null) => void
-      ) => () => void;
       deleteAccountData?: (
         accountId: string,
         expectedAuthGeneration: number
@@ -1679,11 +1671,6 @@ declare global {
       promptAccessibilityPermission: () => Promise<boolean>;
       readClipboard: () => Promise<string>;
       writeClipboard: (text: string) => Promise<{ success: boolean }>;
-      copyLeaderboardImage: (dataUrl: string) => Promise<{ success: boolean; error?: string }>;
-      saveLeaderboardImage: (
-        dataUrl: string,
-        suggestedName: string
-      ) => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
       checkPasteTools: () => Promise<PasteToolsResult>;
 
       // Audio
@@ -2035,7 +2022,7 @@ declare global {
       onShowSettings?: (callback: () => void) => () => void;
 
       // Accessibility permission events (macOS)
-      markMacAccessibilityFeaturesReady?: (expectedAccountScope?: ActiveAccountScope) => void;
+      markMacAccessibilityFeaturesReady?: () => void;
       onAccessibilityMissing?: (callback: () => void) => () => void;
       checkAccessibilityTrusted?: () => Promise<boolean>;
 
@@ -2938,17 +2925,6 @@ declare global {
       // Google Calendar event listeners
       onGcalConnectionChanged?: (callback: (data: any) => void) => () => void;
       onGcalEventsSynced?: (callback: (data: any) => void) => () => void;
-
-      // Microsoft Calendar
-      mcalStartOAuth?: () => Promise<{ success: boolean; email?: string; error?: string }>;
-      mcalDisconnect?: (email?: string) => Promise<{ success: boolean; error?: string }>;
-      mcalGetConnectionStatus?: () => Promise<{
-        connected: boolean;
-        accounts: Array<{ email: string }>;
-      }>;
-      mcalSetPrimaryOnly?: (value: boolean) => Promise<{ success: boolean; error?: string }>;
-      onMcalConnectionChanged?: (callback: (data: any) => void) => () => void;
-      onMcalEventsSynced?: (callback: (data: any) => void) => () => void;
 
       // Apple Calendar (macOS EventKit)
       acalConnect?: () => Promise<{ success: boolean; reason?: string; error?: string }>;

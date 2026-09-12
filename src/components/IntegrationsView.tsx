@@ -165,19 +165,12 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
     setGcalAccounts,
     gcalPrimaryOnly,
     setGcalPrimaryOnly,
-    mcalAccounts,
-    setMcalAccounts,
-    mcalPrimaryOnly,
-    setMcalPrimaryOnly,
     appleCalendarConnected,
     setAppleCalendarConnected,
   } = useSettingsStore();
   const [isConnecting, setIsConnecting] = useState(false);
   const [disconnectingEmail, setDisconnectingEmail] = useState<string | null>(null);
   const [confirmDisconnectEmail, setConfirmDisconnectEmail] = useState<string | null>(null);
-  const [isMsConnecting, setIsMsConnecting] = useState(false);
-  const [msDisconnectingEmail, setMsDisconnectingEmail] = useState<string | null>(null);
-  const [confirmMsDisconnectEmail, setConfirmMsDisconnectEmail] = useState<string | null>(null);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isAppleConnecting, setIsAppleConnecting] = useState(false);
   const [appleSourceNames, setAppleSourceNames] = useState<string[]>([]);
@@ -210,24 +203,6 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
       setIsConnecting(false);
     }
   }, [setGcalAccounts]);
-
-  const startMicrosoftOAuth = useCallback(async () => {
-    setIsMsConnecting(true);
-    try {
-      const result = await window.electronAPI?.mcalStartOAuth?.();
-      if (result?.success && result.email) {
-        const current = useSettingsStore.getState().mcalAccounts;
-        setMcalAccounts([
-          ...current.filter((a) => a.email !== result.email),
-          { email: result.email },
-        ]);
-      } else if (!result?.error?.includes("access_denied")) {
-        setOauthErrorKey("integrations.microsoftCalendar");
-      }
-    } finally {
-      setIsMsConnecting(false);
-    }
-  }, [setMcalAccounts]);
 
   const connectAppleCalendar = useCallback(async () => {
     setIsAppleConnecting(true);
@@ -264,11 +239,6 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
     [withSystemAudioGate, startOAuth]
   );
 
-  const handleMicrosoftConnect = useCallback(
-    () => withSystemAudioGate(startMicrosoftOAuth),
-    [withSystemAudioGate, startMicrosoftOAuth]
-  );
-
   const handleAppleConnect = useCallback(
     () => withSystemAudioGate(connectAppleCalendar),
     [withSystemAudioGate, connectAppleCalendar]
@@ -294,20 +264,6 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
     [setGcalAccounts]
   );
 
-  const handleMicrosoftDisconnect = useCallback(
-    async (email: string) => {
-      setMsDisconnectingEmail(email);
-      try {
-        await window.electronAPI?.mcalDisconnect?.(email);
-        const current = useSettingsStore.getState().mcalAccounts;
-        setMcalAccounts(current.filter((a) => a.email !== email));
-      } finally {
-        setMsDisconnectingEmail(null);
-      }
-    },
-    [setMcalAccounts]
-  );
-
   useEffect(() => {
     const unsub = window.electronAPI?.onGcalConnectionChanged?.(
       (data: {
@@ -328,15 +284,6 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
     );
     return () => unsub?.();
   }, [setGcalAccounts]);
-
-  useEffect(() => {
-    const unsub = window.electronAPI?.onMcalConnectionChanged?.(
-      (data: { accounts?: Array<{ email: string }> }) => {
-        if (data.accounts) setMcalAccounts(data.accounts);
-      }
-    );
-    return () => unsub?.();
-  }, [setMcalAccounts]);
 
   useEffect(() => {
     if (!isMac) return;
@@ -445,27 +392,6 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
         variant="destructive"
         onConfirm={() => {
           if (confirmDisconnectEmail) handleDisconnect(confirmDisconnectEmail);
-        }}
-      />
-
-      <ConfirmDialog
-        open={!!confirmMsDisconnectEmail}
-        onOpenChange={(open) => {
-          if (!open) setConfirmMsDisconnectEmail(null);
-        }}
-        title={
-          <BidiInterpolatedText
-            text={t("integrations.microsoftCalendar.disconnectConfirm", {
-              email: BIDI_VALUE_TOKEN,
-            })}
-            value={confirmMsDisconnectEmail}
-          />
-        }
-        description={t("integrations.microsoftCalendar.disconnectDescription")}
-        confirmText={t("integrations.microsoftCalendar.disconnect")}
-        variant="destructive"
-        onConfirm={() => {
-          if (confirmMsDisconnectEmail) handleMicrosoftDisconnect(confirmMsDisconnectEmail);
         }}
       />
 

@@ -60,15 +60,11 @@ export function useUpcomingEvents(): UseUpcomingEventsReturn {
     const unsubGcal = window.electronAPI?.onGcalEventsSynced?.(() => {
       fetchEvents();
     });
-    const unsubMcal = window.electronAPI?.onMcalEventsSynced?.(() => {
-      fetchEvents();
-    });
     const unsubAcal = window.electronAPI?.onAcalEventsSynced?.(() => {
       fetchEvents();
     });
     return () => {
       unsubGcal?.();
-      unsubMcal?.();
       unsubAcal?.();
     };
   }, [isConnected, fetchEvents]);

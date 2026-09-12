@@ -431,21 +431,6 @@ function audioExtensionForMime(mimeType) {
   return "webm";
 }
 
-// Workspace-managed Azure STT: the Entra token lives in the main process, so
-// dictation dispatches over IPC exactly like the proxied providers below.
-const MANAGED_TRANSCRIPTION_SPEC = {
-  displayName: "Managed Azure",
-  ipc: () => window.electronAPI?.managedTranscribe,
-  buildPayload: ({ audioBuffer, language, dictionaryPrompt, managedResolution, mimeType }) => ({
-    audioBuffer,
-    fileName: `audio.${audioExtensionForMime(mimeType)}`,
-    mimeType,
-    language,
-    prompt: dictionaryPrompt || undefined,
-    managed: { provider: managedResolution.provider, context: managedResolution.context },
-  }),
-};
-
 const PROXY_TRANSCRIPTION_PROVIDERS = {
   tinfoil: {
     displayName: "Tinfoil",

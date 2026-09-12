@@ -9,7 +9,7 @@ import googleCalendarIcon from "../../assets/icons/google-calendar.svg";
 import appleCalendarIcon from "../../assets/icons/apple-calendar.webp";
 import meetingDetectedPanel from "../../assets/onboarding-notes-meeting-detected.webp";
 
-type ProviderId = "google" | "microsoft" | "apple";
+type ProviderId = "google" | "apple";
 
 export default function CalendarConnectionsStep() {
   const { t } = useTranslation();
@@ -48,17 +48,6 @@ export default function CalendarConnectionsStep() {
           } else if (!result?.error?.includes("access_denied")) {
             setError(t("integrations.googleCalendar.connectFailedDescription"));
           }
-        } else if (provider === "microsoft") {
-          const result = await window.electronAPI?.mcalStartOAuth?.();
-          if (result?.success && result.email) {
-            const current = useSettingsStore.getState().mcalAccounts;
-            store.setMcalAccounts([
-              ...current.filter((account) => account.email !== result.email),
-              { email: result.email },
-            ]);
-          } else if (!result?.error?.includes("access_denied")) {
-            setError(t("integrations.microsoftCalendar.connectFailedDescription"));
-          }
         } else {
           const result = await window.electronAPI?.acalConnect?.();
           if (result?.success) {
@@ -84,15 +73,11 @@ export default function CalendarConnectionsStep() {
     const google = window.electronAPI?.onGcalConnectionChanged?.((data) => {
       if (data.accounts) store.setGcalAccounts(data.accounts);
     });
-    const microsoft = window.electronAPI?.onMcalConnectionChanged?.((data) => {
-      if (data.accounts) store.setMcalAccounts(data.accounts);
-    });
     const apple = window.electronAPI?.onAcalConnectionChanged?.((data) => {
       store.setAppleCalendarConnected(data.connected);
     });
     return () => {
       google?.();
-      microsoft?.();
       apple?.();
     };
   }, [store]);

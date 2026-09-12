@@ -65,10 +65,8 @@ const registerListener = (channel, handlerFactory) => {
 contextBridge.exposeInMainWorld("electronAPI", {
   setOnboardingWindowMode: (mode) => ipcRenderer.invoke("onboarding-set-window-mode", mode),
   setOnboardingActive: (active) => ipcRenderer.invoke("onboarding-set-active", active),
-  markMacAccessibilityFeaturesReady: (expectedAccountScope) =>
-    expectedAccountScope
-      ? ipcRenderer.send("mac-accessibility-features-ready", expectedAccountScope)
-      : ipcRenderer.send("mac-accessibility-features-ready"),
+  markMacAccessibilityFeaturesReady: () =>
+    ipcRenderer.send("mac-accessibility-features-ready"),
   beginOnboardingDemo: (session) => ipcRenderer.invoke("onboarding-demo-begin", session),
   endOnboardingDemo: (id) => ipcRenderer.invoke("onboarding-demo-end", id),
   stopOnboardingDemo: (id) => ipcRenderer.invoke("onboarding-demo-stop", id),
@@ -242,13 +240,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Space functions
   getSpaces: () => ipcRenderer.invoke("db-get-spaces"),
-  setActiveAccountScope: (accountId, expectedAuthGeneration) =>
-    ipcRenderer.invoke("set-active-account-scope", accountId, expectedAuthGeneration),
-  getActiveAccountScope: () => ipcRenderer.invoke("get-active-account-scope"),
-  onActiveAccountScopeChanged: registerListener(
-    "active-account-scope-changed",
-    (callback) => (_event, scope) => callback(scope)
-  ),
   deleteAccountData: (accountId, expectedAuthGeneration) =>
     ipcRenderer.invoke("delete-account-data", accountId, expectedAuthGeneration),
   updateSpace: (id, updates) => ipcRenderer.invoke("db-update-space", id, updates),
@@ -395,9 +386,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   promptAccessibilityPermission: () => ipcRenderer.invoke("prompt-accessibility-permission"),
   readClipboard: () => ipcRenderer.invoke("read-clipboard"),
   writeClipboard: (text) => ipcRenderer.invoke("write-clipboard", text),
-  copyLeaderboardImage: (dataUrl) => ipcRenderer.invoke("leaderboard-copy-image", dataUrl),
-  saveLeaderboardImage: (dataUrl, suggestedName) =>
-    ipcRenderer.invoke("leaderboard-save-image", dataUrl, suggestedName),
   checkPasteTools: () => ipcRenderer.invoke("check-paste-tools"),
 
   // Voice drafts (chat input recordings)
@@ -677,20 +665,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     (callback) => (_event, payload) => callback(payload)
   ),
   listBedrockModels: (config) => ipcRenderer.invoke("bedrock-list-models", config),
-  getManagedEnterpriseConfig: (accountId, workspaceId, expectedAuthGeneration, forceRefresh) =>
-    ipcRenderer.invoke(
-      "get-managed-enterprise-config",
-      accountId,
-      workspaceId,
-      expectedAuthGeneration,
-      forceRefresh
-    ),
-  onManagedEnterpriseConfigChanged: registerListener(
-    "managed-enterprise-config-changed",
-    (callback) => (_event, snapshot) => callback(snapshot)
-  ),
-  clearManagedEnterpriseIdentity: () => ipcRenderer.invoke("clear-managed-enterprise-identity"),
-  managedTranscribe: (data) => ipcRenderer.invoke("managed-transcribe", data),
 
   // llama.cpp
   llamaCppCheck: () => ipcRenderer.invoke("llama-cpp-check"),
@@ -1260,12 +1234,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   calendarGetAvailability: (request) => ipcRenderer.invoke("calendar-get-availability", request),
   gcalGetEvent: (eventId) => ipcRenderer.invoke("gcal-get-event", eventId),
 
-  // Microsoft Calendar
-  mcalStartOAuth: () => ipcRenderer.invoke("mcal-start-oauth"),
-  mcalDisconnect: (email) => ipcRenderer.invoke("mcal-disconnect", email),
-  mcalGetConnectionStatus: () => ipcRenderer.invoke("mcal-get-connection-status"),
-  mcalSetPrimaryOnly: (value) => ipcRenderer.invoke("mcal-set-primary-only", value),
-
   // Apple Calendar (macOS EventKit)
   acalConnect: () => ipcRenderer.invoke("acal-connect"),
   acalDisconnect: () => ipcRenderer.invoke("acal-disconnect"),
@@ -1284,16 +1252,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   ),
   onGcalEventsSynced: registerListener(
     "gcal-events-synced",
-    (callback) => (_event, data) => callback(data)
-  ),
-
-  // Microsoft Calendar event listeners
-  onMcalConnectionChanged: registerListener(
-    "mcal-connection-changed",
-    (callback) => (_event, data) => callback(data)
-  ),
-  onMcalEventsSynced: registerListener(
-    "mcal-events-synced",
     (callback) => (_event, data) => callback(data)
   ),
 

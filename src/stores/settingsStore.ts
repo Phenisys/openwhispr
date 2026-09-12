@@ -2380,7 +2380,6 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setMcalPrimaryOnly: (value: boolean) => {
     if (isBrowser) localStorage.setItem("mcalPrimaryOnly", String(value));
     useSettingsStore.setState({ mcalPrimaryOnly: value });
-    if (isBrowser) window.electronAPI?.mcalSetPrimaryOnly?.(value);
   },
   setAppleCalendarConnected: createBooleanSetter("appleCalendarConnected"),
   setMeetingProcessDetection: createBooleanSetter("meetingProcessDetection"),
@@ -3519,17 +3518,6 @@ export async function initializeSettings(): Promise<void> {
     } catch (err) {
       logger.warn(
         "Failed to sync gcal primary-only on startup",
-        { error: (err as Error).message },
-        "settings"
-      );
-    }
-
-    try {
-      const currentState = useSettingsStore.getState();
-      await window.electronAPI.mcalSetPrimaryOnly?.(currentState.mcalPrimaryOnly);
-    } catch (err) {
-      logger.warn(
-        "Failed to sync mcal primary-only on startup",
         { error: (err as Error).message },
         "settings"
       );
