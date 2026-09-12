@@ -2702,9 +2702,12 @@ export interface ResolvedMeetingTranscription {
 export const selectResolvedMeetingTranscription = (
   state: SettingsState
 ): ResolvedMeetingTranscription => {
-  // Cloud streaming transcription was removed with the account/cloud purge;
-  // meeting transcription is local-only now.
-  const cloudTranscriptionProvider = "";
+  // The hosted streaming provider went away with the account/cloud purge, so
+  // there is no catalog left to default from. Note Recording routes to the one
+  // provider the user picked for meeting audio — never to the dictation
+  // provider, which is a different choice the user may never have made here.
+  // Unset reads as "", and the router turns that into `noProviderSelected`.
+  const cloudTranscriptionProvider = state.meetingCloudTranscriptionProvider;
 
   return {
     useLocalWhisper: state.meetingUseLocalWhisper,
