@@ -159,16 +159,19 @@ test("Note Recording modes survive the follow-flag migration", async (t) => {
     }
   );
 
-  await t.test("a ≤1.6.7 hosted-cloud profile falls back to BYOK after the purge", async () => {
+  await t.test("a ≤1.6.7 hosted-cloud profile falls back to local for Note Recording", async () => {
     const { state } = await load({
       useLocalWhisper: "false",
       cloudTranscriptionMode: "openwhispr",
       cloudReasoningMode: "openwhispr",
       isSignedIn: "true",
     });
-    // The mode the copy carries is the same one dictation derives: the purge
-    // reads a legacy hosted-cloud value back as the BYOK fallback.
-    assert.equal(state.meetingTranscriptionMode, "providers");
+    // The two sides heal differently. The mode the copy carries is the one
+    // dictation derives, and dictation reads a legacy hosted-cloud value back
+    // as its BYOK fallback. Note Recording goes local-ward instead
+    // (t_c30655bd): `providers` with no provider ever picked for meeting audio
+    // is the dead end that failed every start with `noProviderSelected`.
+    assert.equal(state.meetingTranscriptionMode, "local");
     assert.equal(state.noteFormattingMode, "providers");
   });
 
@@ -198,7 +201,9 @@ test("Note Recording modes survive the follow-flag migration", async (t) => {
       assert.equal(storage.getItem("meetingCloudTranscriptionMode"), null);
       assert.equal(storage.getItem("noteFormattingCloudMode"), null);
       assert.equal(storage.getItem("meetingFollowsTranscription"), "false", "latched empty");
-      assert.equal(state.meetingTranscriptionMode, "openwhispr");
+      // What the copy wrote is the legacy hosted-cloud value; the reader heals
+      // it local-ward (t_c30655bd) so a fresh install can start a note at all.
+      assert.equal(state.meetingTranscriptionMode, "local", "nothing serviceable behind it");
       assert.equal(countWrites("meetingTranscriptionMode"), 1, "the copy, nothing after it");
       assert.equal(countWrites("noteFormattingMode"), 1);
     }
@@ -251,7 +256,9 @@ test("Note Recording modes survive the follow-flag migration", async (t) => {
       noteFormattingCloudMode: "openwhispr",
     });
     assert.equal(storage.getItem("meetingTranscriptionMode"), "openwhispr", "persisted");
-    assert.equal(state.meetingTranscriptionMode, "providers", "reconstructed, not localized");
+    // The persisted value is the removed hosted-cloud mode, and the reader heals
+    // it local-ward (t_c30655bd) rather than onto a provider choice nobody made.
+    assert.equal(state.meetingTranscriptionMode, "local", "reconstructed, then healed");
     // A cloud reasoning snapshot is left absent, so note formatting keeps
     // following dictation cleanup. Same effective value here, no pin.
     assert.equal(storage.getItem("noteFormattingMode"), null);
