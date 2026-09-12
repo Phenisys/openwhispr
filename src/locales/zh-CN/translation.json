@@ -1426,7 +1426,8 @@
     },
     "view": {
       "customPrompt": "自定义提示词",
-      "defaultPrompt": "默认提示词","emptyPrompt": "无提示词",
+      "defaultPrompt": "默认提示词",
+      "emptyPrompt": "无提示词",
       "modified": "已修改"
     },
     "defaultTestInputTranslate": "今天天气真好，要不要出去走走？"
@@ -1802,6 +1803,18 @@
         "availableTitle": "可使用组织配置",
         "availableDescription": "使用 {{provider}}，无需管理凭据。",
         "useManaged": "使用托管配置"
+      },
+      "advanced": {
+        "localTimeoutHelp": "本地推理请求被中止前的秒数。",
+        "localTimeoutLabel": "本地模型超时（llama.cpp）",
+        "maxTokensHelp": "生成词元的上限。0 = 自动。",
+        "maxTokensLabel": "最大输出词元数",
+        "retryHelp": "请求失败后的重试次数。0 = 仅一次。",
+        "retryLabel": "重试次数",
+        "secondsSuffix": "秒",
+        "timeoutHelp": "推理请求被中止前的秒数。",
+        "timeoutLabel": "请求超时",
+        "title": "高级"
       }
     },
     "developer": {
@@ -2142,7 +2155,17 @@
     },
     "prompts": {
       "description": "查看、自定义和测试用于文本整理和指令识别的统一系统提示词",
-      "title": "提示词工作室"
+      "title": "提示词工作室",
+      "enhancementDescription": "用于重组和润色原始笔记的系统提示词。",
+      "enhancementTitle": "笔记润色提示词",
+      "meetingDescription": "用于把双人会议转写整理成行动笔记的系统提示词。",
+      "meetingTitle": "会议笔记提示词",
+      "selectionEditDescription": "通过语音编辑所选文本时追加的系统后缀。",
+      "selectionEditTitle": "选区编辑提示词",
+      "titleGenerationDescription": "自动生成笔记标题时使用的系统提示词。",
+      "titleGenerationTitle": "标题生成提示词",
+      "toolInstructionsDescription": "描述聊天代理可调用工具的说明。留空则保留每个工具的默认值。",
+      "toolInstructionsTitle": "代理工具说明"
     },
     "speechToText": {
       "title": "语音转文字",

@@ -14,7 +14,6 @@ import type {
 import type { CalendarAccount } from "../types/calendar";
 import { PROMPT_KIND_LIST, type PromptKind } from "../config/prompts/registry";
 import { sweepRetiredPromptOverrides } from "../config/retiredPrompts";
-import { sweepRetiredCloudModelSelections } from "../config/retiredCloudModels";
 import {
   deriveReasoningMode,
   buildReasoningScopePatches,
@@ -57,8 +56,6 @@ import type {
   ChatAgentSettings,
 } from "../hooks/useSettings";
 import type { Snippet } from "../utils/snippets";
-import type { EnterpriseSetupMode } from "../types/enterpriseIdentity";
-import { getManagedScopeResolution } from "./enterpriseIdentityStore";
 
 let _ReasoningService: typeof import("../services/ReasoningService").default | null = null;
 
@@ -822,31 +819,6 @@ function tinfoilModelName(modelId: string): string {
 // request. Runs after migrateLLMScopeKeys so scope values live under their
 // final keys, and before the store reads them, so the first request of the
 // session already carries a model the provider serves.
-function migrateRetiredCloudModels() {
-  if (!isBrowser) return;
-  const swept = sweepRetiredCloudModelSelections(
-    localStorage,
-    Object.values(INFERENCE_SCOPES).map(({ storeKeys }) => storeKeys)
-  );
-  if (swept.length === 0) return;
-
-  logger.info(
-    "Repointed retired cloud model selections",
-    { scopes: swept.map(({ storeKey }) => storeKey) },
-    "settings"
-  );
-
-  // Tinfoil is the one provider that tells the user their model was switched
-  // out, and getting here first means reconcileSelectedModels no longer will.
-  const announced = new Set<string>();
-  for (const { provider, from, to } of swept) {
-    if (provider !== "tinfoil" || announced.has(from)) continue;
-    announced.add(from);
-    recordTinfoilModelSwitch({ from: tinfoilModelName(from), to: tinfoilModelName(to) });
-  }
-}
-
-migrateRetiredCloudModels();
 
 export interface SettingsState
   extends
@@ -1139,8 +1111,6 @@ export interface SettingsState
   setCortiTenant: (value: string) => void;
 
   // Enterprise providers
-  enterpriseSetupMode: EnterpriseSetupMode;
-  enterpriseTranscriptionSetupMode: EnterpriseSetupMode;
   bedrockAuthMode: string;
   bedrockRegion: string;
   bedrockProfile: string;
@@ -1156,8 +1126,6 @@ export interface SettingsState
   vertexLocation: string;
   vertexApiKey: string;
   setBedrockAuthMode: (value: string) => void;
-  setEnterpriseSetupMode: (value: EnterpriseSetupMode) => void;
-  setEnterpriseTranscriptionSetupMode: (value: EnterpriseSetupMode) => void;
   setBedrockRegion: (value: string) => void;
   setBedrockProfile: (value: string) => void;
   setBedrockAccessKeyId: (key: string) => void;
@@ -1549,16 +1517,6 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   cleanupCustomApiKey: "",
 
   // Enterprise providers
-  enterpriseSetupMode: (() => {
-    const v = readString("enterpriseSetupMode", "auto");
-    if (v === "auto" || v === "managed" || v === "manual") return v;
-    return "auto" as EnterpriseSetupMode;
-  })(),
-  enterpriseTranscriptionSetupMode: (() => {
-    const v = readString("enterpriseTranscriptionSetupMode", "auto");
-    if (v === "auto" || v === "managed" || v === "manual") return v;
-    return "auto" as EnterpriseSetupMode;
-  })(),
   bedrockAuthMode: readString("bedrockAuthMode", "sso"),
   bedrockRegion: readString("bedrockRegion", "us-east-1"),
   bedrockProfile: readString("bedrockProfile", ""),
@@ -1700,13 +1658,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   remoteTranscriptionModel: readString("remoteTranscriptionModel", ""),
   cleanupMode: (() => {
     const v = readString("cleanupMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1751,13 +1703,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   noteFormattingMode: (() => {
     const v = readString("noteFormattingMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1770,13 +1716,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   translationMode: (() => {
     const v = readString("translationMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1880,17 +1820,12 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 
   chatAgentModel: readString("chatAgentModel", "openai/gpt-oss-120b"),
   chatAgentProvider: readString("chatAgentProvider", "groq"),
-both
+  chatAgentKey: readString("chatAgentKey", ""),
+  chatAgentCloudMode: readString("chatAgentCloudMode", "byok"),
 
   chatAgentMode: (() => {
     const v = readString("chatAgentMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -1900,13 +1835,7 @@ both
 
   dictationAgentMode: (() => {
     const v = readString("dictationAgentMode", "providers");
-    if (
-      v === "providers" ||
-      v === "local" ||
-      v === "self-hosted" ||
-      v === "enterprise"
-    )
-      return v;
+    if (v === "providers" || v === "local" || v === "self-hosted" || v === "enterprise") return v;
     // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
     return "providers" as InferenceMode;
   })(),
@@ -2098,15 +2027,13 @@ both
   setCustomDictionary: (words: string[]) => {
     if (isBrowser) localStorage.setItem("customDictionary", JSON.stringify(words));
     set({ customDictionary: words });
-    window.electronAPI
-      ?.setDictionary(words)
-      .catch((err) => {
-        logger.warn(
-          "Failed to sync dictionary to SQLite",
-          { error: (err as Error).message },
-          "settings"
-        );
-      });
+    window.electronAPI?.setDictionary(words).catch((err) => {
+      logger.warn(
+        "Failed to sync dictionary to SQLite",
+        { error: (err as Error).message },
+        "settings"
+      );
+    });
   },
 
   updateCustomDictionary: ({ add = [], remove = [] }) => {
@@ -2157,15 +2084,13 @@ both
   setSnippets: (snippets: Snippet[]) => {
     if (isBrowser) localStorage.setItem("snippets", JSON.stringify(snippets));
     set({ snippets });
-    window.electronAPI
-      ?.setSnippets?.(snippets)
-      .catch((err) => {
-        logger.warn(
-          "Failed to sync snippets to SQLite",
-          { error: (err as Error).message },
-          "settings"
-        );
-      });
+    window.electronAPI?.setSnippets?.(snippets).catch((err) => {
+      logger.warn(
+        "Failed to sync snippets to SQLite",
+        { error: (err as Error).message },
+        "settings"
+      );
+    });
   },
 
   // For broadcasts from main process — DB is already authoritative, only update UI.
@@ -2226,12 +2151,6 @@ both
   },
 
   // Enterprise provider setters
-  setEnterpriseSetupMode: createStringSetter("enterpriseSetupMode") as (
-    value: EnterpriseSetupMode
-  ) => void,
-  setEnterpriseTranscriptionSetupMode: createStringSetter("enterpriseTranscriptionSetupMode") as (
-    value: EnterpriseSetupMode
-  ) => void,
   setBedrockAuthMode: (value: string) => {
     if (isBrowser) localStorage.setItem("bedrockAuthMode", value);
     set({ bedrockAuthMode: value });
@@ -2784,6 +2703,7 @@ export const selectResolvedMeetingTranscription = (
     whisperModel: state.meetingWhisperModel || state.whisperModel,
     localTranscriptionProvider: state.meetingLocalTranscriptionProvider,
     parakeetModel: state.meetingParakeetModel || state.parakeetModel,
+    cohereModel: state.meetingCohereModel || state.cohereModel,
     cloudTranscriptionProvider,
     cloudTranscriptionModel: state.meetingCloudTranscriptionModel || state.cloudTranscriptionModel,
     cloudTranscriptionBaseUrl:
@@ -2932,7 +2852,6 @@ export const selectResolvedLLMConfig = (
     3;
 
   const localConfig: ResolvedLLMConfig = {
-
     scope,
     mode: state[def.storeKeys.mode] as InferenceMode,
     provider: read("provider") || fallback?.provider || "",
@@ -2949,17 +2868,7 @@ export const selectResolvedLLMConfig = (
     maxTokens,
     maxRetries,
   };
-  const managed = getManagedScopeResolution(scope, state.enterpriseSetupMode);
-  if (managed.kind === "error") {
-    return { ...localConfig, mode: "enterprise", provider: "", model: "" };
-  }
-  if (managed.kind !== "managed") return localConfig;
-  return {
-    ...localConfig,
-    mode: "enterprise",
-    provider: managed.provider,
-    model: managed.model,
-  };
+  return localConfig;
 };
 
 // Scope custom keys are secrets kept in the OS secure store, not localStorage
@@ -3372,25 +3281,6 @@ export async function initializeSettings(): Promise<void> {
           useSettingsStore.getState();
         if (chatAgentCustomApiKey) setDictationAgentCustomApiKey(chatAgentCustomApiKey);
         localStorage.setItem("_dictationAgentSeeded", "1");
-      }
-
-      if (!localStorage.getItem("enterpriseSetupMode")) {
-        // One-time migration. "Managed by default" is meant to equip employees who never chose a
-        // provider — not to move someone who deliberately set up local, self-hosted, BYOK, or
-        // enterprise inference. Anyone with an existing choice starts on "manual" and opts in.
-        const hasChosenProvider =
-          Object.values(INFERENCE_SCOPES).some((scope) => {
-            const stored = localStorage.getItem(scope.storeKeys.mode as string);
-            return Boolean(stored) && stored !== "openwhispr";
-          }) ||
-          Boolean(
-            useSettingsStore.getState().bedrockProfile.trim() ||
-            (bedrockAccessKeyId && bedrockSecretAccessKey) ||
-            azureApiKey
-          );
-        const enterpriseSetupMode: EnterpriseSetupMode = hasChosenProvider ? "manual" : "auto";
-        localStorage.setItem("enterpriseSetupMode", enterpriseSetupMode);
-        useSettingsStore.setState({ enterpriseSetupMode });
       }
 
       for (const key of STALE_SECRET_LOCALSTORAGE_KEYS) {

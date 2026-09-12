@@ -15,7 +15,6 @@ const MEETING_BYOK_PROVIDER_IDS = getMeetingStreamingTranscriptionProviders().ma
   (provider) => provider.id
 );
 
-
 export function MeetingSpeakerDetectionRow() {
   const { t } = useTranslation();
   const speakerDiarizationEnabled = useSettingsStore((s) => s.speakerDiarizationEnabled);
@@ -36,7 +35,6 @@ const noop = () => {};
 export function MeetingTranscriptionPanel() {
   const { t } = useTranslation();
   const policySnapshot = usePolicySnapshot();
-
 
   const {
     meetingTranscriptionMode,
@@ -91,7 +89,7 @@ export function MeetingTranscriptionPanel() {
   );
   const handleTranscriptionModeSelect = (mode: InferenceMode) => {
     if (!isModeAllowed(mode)) return;
-      if (mode === effectiveTranscriptionMode) return;
+    if (mode === effectiveTranscriptionMode) return;
 
     setMeetingTranscriptionMode(mode);
     setMeetingUseLocalWhisper(mode === "local");

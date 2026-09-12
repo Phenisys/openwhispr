@@ -27,7 +27,6 @@ export interface ReasoningConfig {
   timeoutMs?: number;
   /** Retry attempts after a failed request. 0 = single attempt. Falls back to the global default (3). */
   maxRetries?: number;
-
 }
 
 export abstract class BaseReasoningService {

@@ -37,7 +37,6 @@ export function resolveMeetingTranscriptionOptions({
   selectedProvider,
   selectedModel,
   byokProviders,
-  managedProviders,
   cortiEnvironment,
   cortiTenant,
   keyterms,
@@ -52,16 +51,6 @@ export function resolveMeetingTranscriptionOptions({
           : localProvider === "cohere"
             ? cohereModel || "cohere-transcribe-03-2026"
             : whisperModel || "base",
-      language,
-    };
-  }
-
-  if (transcriptionMode === "openwhispr") {
-    const provider = managedProviders?.[0] ?? DEFAULT_MANAGED_PROVIDER;
-    return {
-      provider: `${provider.id}-realtime`,
-      model: resolveModel(provider, selectedModel),
-      mode: "openwhispr",
       language,
     };
   }

@@ -4,7 +4,6 @@ import { useShallow } from "zustand/react/shallow";
 import { Plus, Sparkles } from "../icons";
 import { useToast } from "../ui/useToast";
 import NoteEditor from "./NoteEditor";
-import SpacesTree from "./SpacesTree";
 import { ContainerOverview } from "./overview/ContainerOverview";
 import NotesStructureIntroDialog from "./NotesStructureIntroDialog";
 import ActionPicker from "./ActionPicker";
@@ -62,8 +61,6 @@ import {
   setSessionExpectedCount,
 } from "../../stores/meetingRecordingStore";
 import { useNotesOnboarding } from "../../hooks/useNotesOnboarding";
-import { useTeamSpacesCapability } from "../../hooks/useTeamSpacesCapability";
-import { useAuth } from "../../hooks/useAuth";
 import { usePolicySnapshot, useTranscriptionContextAllowed } from "../../hooks/usePolicy";
 import NotesOnboarding from "./NotesOnboarding";
 import { defaultFolderDisplayName, notesEmptyTitleKey } from "./shared";
@@ -231,8 +228,6 @@ export default function PersonalNotesView({
   const isCloudMode = noteFormatting.isCloudMode;
   const effectiveModelId = noteFormatting.modelId;
   const { isComplete: isOnboardingComplete, complete: completeOnboarding } = useNotesOnboarding();
-  const { isSignedIn, user } = useAuth();
-  const teamSpacesAvailable = useTeamSpacesCapability(isSignedIn);
   const isTreeLoading = useIsTreeLoading();
   const [structureIntroPending, setStructureIntroPending] = useState(() =>
     shouldShowIntro(localStorage, NOTES_STRUCTURE_INTRO)
@@ -268,24 +263,10 @@ export default function PersonalNotesView({
   }, []);
 
   useEffect(() => {
-    if (
-      structureIntroPending &&
-      isOnboardingComplete &&
-      isSignedIn &&
-      teamSpacesAvailable &&
-      !isTreeLoading &&
-      !isSidePanelLayout
-    ) {
+    if (structureIntroPending && isOnboardingComplete && !isTreeLoading && !isSidePanelLayout) {
       setShowStructureIntro(true);
     }
-  }, [
-    structureIntroPending,
-    isOnboardingComplete,
-    isSignedIn,
-    teamSpacesAvailable,
-    isTreeLoading,
-    isSidePanelLayout,
-  ]);
+  }, [structureIntroPending, isOnboardingComplete, isTreeLoading, isSidePanelLayout]);
 
   // Arriving via an accepted invitation reopens the structure intro even when
   // this device has already seen it, and even before notes onboarding is done
@@ -725,8 +706,8 @@ export default function PersonalNotesView({
         for (const m of mappingRows) speakerMappings[m.speaker_id] = m.display_name;
 
         const identity: MeetingIdentity = {
-          selfName: user?.name?.trim() || null,
-          selfEmail: user?.email?.trim() || null,
+          selfName: null,
+          selfEmail: null,
           participants: parseNoteParticipants(editorNote.participants),
         };
         const selfLabel = identity.selfName || t("notes.speaker.you");
@@ -784,14 +765,6 @@ export default function PersonalNotesView({
               {t("notes.sidebar.actions")}
             </button>
           </div>
-
-          <SpacesTree
-            onDeleteNote={handleDelete}
-            onMoveNote={handleMoveNote}
-            onCreateFolderAndMove={handleCreateFolderAndMove}
-            onNewNote={handleNewNoteIn}
-            onShowStructureIntro={() => setShowStructureIntro(true)}
-          />
         </div>
       </div>
 

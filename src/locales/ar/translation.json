@@ -964,7 +964,8 @@
     "view": {
       "customPrompt": "مطالبة مخصصة",
       "defaultPrompt": "المطالبة الافتراضية",
-      "modified": "مُعدل"
+      "modified": "مُعدل",
+      "emptyPrompt": "لا يوجد موجه"
     },
     "defaultTestInputTranslate": "الطقس جميل اليوم، هل ترغب في الذهاب للتمشي؟"
   },
@@ -2836,6 +2837,18 @@
         "availableTitle": "إعداد المؤسسة متاح",
         "availableDescription": "استخدم {{provider}} دون إدارة بيانات الاعتماد.",
         "useManaged": "استخدام الإعداد المُدار"
+      },
+      "advanced": {
+        "localTimeoutHelp": "عدد الثواني قبل إلغاء طلب استدلال محلي.",
+        "localTimeoutLabel": "مهلة النموذج المحلي (llama.cpp)",
+        "maxTokensHelp": "حد الرموز المولَّدة. 0 = تلقائي.",
+        "maxTokensLabel": "الحد الأقصى لرموز المخرجات",
+        "retryHelp": "عدد المحاولات بعد طلب فاشل. 0 = محاولة واحدة.",
+        "retryLabel": "محاولات إعادة الإرسال",
+        "secondsSuffix": "ث",
+        "timeoutHelp": "عدد الثواني قبل إلغاء طلب الاستدلال.",
+        "timeoutLabel": "مهلة الطلب",
+        "title": "إعدادات متقدمة"
       }
     },
     "developer": {
@@ -3198,7 +3211,17 @@
     },
     "prompts": {
       "description": "عرض وتخصيص واختبار موجه النظام الموحد الذي يشغل تنظيف النص واكتشاف التعليمات",
-      "title": "استوديو الموجهات"
+      "title": "استوديو الموجهات",
+      "enhancementDescription": "موجه النظام لإعادة هيكلة الملاحظات الخام وصقلها.",
+      "enhancementTitle": "موجه تحسين الملاحظات",
+      "meetingDescription": "موجه النظام لتحويل نصوص الاجتماعات ثنائية المتحدث إلى ملاحظات إجراءات نظيفة.",
+      "meetingTitle": "موجه ملاحظات الاجتماعات",
+      "selectionEditDescription": "لاحقة النظام المطبقة عند تعديل نص محدد بالصوت.",
+      "selectionEditTitle": "موجه تعديل التحديد",
+      "titleGenerationDescription": "موجه النظام المستخدم عند توليد عناوين الملاحظات تلقائيًا.",
+      "titleGenerationTitle": "موجه توليد العناوين",
+      "toolInstructionsDescription": "تعليمات تصف الأدوات التي يمكن لوكيل المحادثة استدعاؤها. اتركها فارغة للإبقاء على الإعدادات الافتراضية لكل أداة.",
+      "toolInstructionsTitle": "تعليمات أدوات الوكيل"
     },
     "speechToText": {
       "title": "تحويل الكلام إلى نص",

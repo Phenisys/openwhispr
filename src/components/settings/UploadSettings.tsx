@@ -79,7 +79,6 @@ export function UploadTranscriptionPanel() {
     setUploadTranscriptionMode(mode);
     setUploadUseLocalWhisper(mode === "local");
     setUploadCloudTranscriptionMode("byok");
-
   };
 
   const handleLocalTranscriptionModelSelect = useCallback(

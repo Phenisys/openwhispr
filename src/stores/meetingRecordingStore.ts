@@ -1,10 +1,9 @@
 import { create } from "zustand";
 import { getSettings, selectResolvedMeetingTranscription } from "./settingsStore";
-import { isBuiltInMicrophone } from "../utils/audioDeviceUtils";
-import {
-  followsSystemDefaultMic,
-  reconcileSavedMicSelection,
-} from "../helpers/micSelectionRecovery";
+import { getMeetingStreamingTranscriptionProviders } from "../models/ModelRegistry";
+import { resolveMeetingTranscriptionOptions } from "../helpers/meetingTranscriptionRouting";
+import { followsSystemDefaultMic } from "../helpers/micSelectionRecovery";
+import { resolvePreferredMicrophone } from "../helpers/microphoneSelection";
 import { ActiveMicRecoveryController } from "../helpers/activeMicRecovery";
 import { getBaseLanguageCode } from "../utils/languageSupport";
 import {
@@ -164,7 +163,6 @@ const getMeetingTranscriptionOptions = () => {
     selectedProvider: resolved.cloudTranscriptionProvider,
     selectedModel: resolved.cloudTranscriptionModel,
     byokProviders: getMeetingStreamingTranscriptionProviders(),
-    managedProviders: useStreamingProvidersStore.getState().providers,
     cortiEnvironment: state.cortiEnvironment,
     cortiTenant: state.cortiTenant,
     keyterms: (state.customDictionary ?? []).filter(Boolean),

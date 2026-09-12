@@ -96,9 +96,11 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
 
   // System prompts without a natural "input → output" test surface
   // (title generation, selection editing, tool instructions).
-  const canTest = !new Set<PromptKind>(["titleGeneration", "selectionEdit", "toolInstructions"]).has(
-    kind
-  );
+  const canTest = !new Set<PromptKind>([
+    "titleGeneration",
+    "selectionEdit",
+    "toolInstructions",
+  ]).has(kind);
 
   const customPrompt = useSettingsStore((s) => s.customPrompts[kind]);
   const setCustomPrompt = useSettingsStore((s) => s.setCustomPrompt);
@@ -277,14 +279,13 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
       setCustomPrompt(kind, editedPrompt);
       try {
         const result = await ReasoningService.processText(testText, modelToUse, agentName, {
-            inferenceScope: "dictationCleanup",
-            disableThinking: effectiveSettings.cleanupDisableThinking,
-            // Note/meeting enhancement prompts are resolved by the caller (not
-            // internally like cleanup), so the test must pass them explicitly.
-            ...(kind === "noteEnhancement" || kind === "meetingEnhancement"
-              ? { systemPrompt: resolvePrompt(kind, { agentName, uiLanguage }) }
-              : {}),
-
+          inferenceScope: "dictationCleanup",
+          disableThinking: effectiveSettings.cleanupDisableThinking,
+          // Note/meeting enhancement prompts are resolved by the caller (not
+          // internally like cleanup), so the test must pass them explicitly.
+          ...(kind === "noteEnhancement" || kind === "meetingEnhancement"
+            ? { systemPrompt: resolvePrompt(kind, { agentName, uiLanguage }) }
+            : {}),
         });
         setTestResult(result);
       } finally {
@@ -312,7 +313,9 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
   const tabs = [
     { id: "current" as const, label: t("promptStudio.tabs.view"), icon: Eye },
     { id: "edit" as const, label: t("promptStudio.tabs.customize"), icon: Edit3 },
-    ...(canTest ? [{ id: "test" as const, label: t("promptStudio.tabs.test"), icon: TestTube }] : []),
+    ...(canTest
+      ? [{ id: "test" as const, label: t("promptStudio.tabs.test"), icon: TestTube }]
+      : []),
   ];
 
   return (
@@ -354,13 +357,12 @@ export default function PromptStudio({ className = "", kind = "cleanup" }: Promp
             <div className="px-5 py-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                    <p className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
-                      {isNoPrompt
-                        ? t("promptStudio.view.emptyPrompt")
-                        : isCustomPrompt
-                          ? t("promptStudio.view.customPrompt")
-                          : t("promptStudio.view.defaultPrompt")}
-
+                  <p className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
+                    {isNoPrompt
+                      ? t("promptStudio.view.emptyPrompt")
+                      : isCustomPrompt
+                        ? t("promptStudio.view.customPrompt")
+                        : t("promptStudio.view.defaultPrompt")}
                   </p>
                   {isCustomPrompt && (
                     <span className="text-xs font-semibold uppercase tracking-wider px-1.5 py-px rounded-full bg-primary/10 text-primary">

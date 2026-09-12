@@ -1519,7 +1519,8 @@
     },
     "view": {
       "customPrompt": "Custom prompt",
-      "defaultPrompt": "Default prompt","emptyPrompt": "No prompt",
+      "defaultPrompt": "Default prompt",
+      "emptyPrompt": "No prompt",
       "modified": "Modified"
     },
     "defaultTestInputTranslate": "The weather is beautiful today, want to go for a walk?"

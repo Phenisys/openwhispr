@@ -112,7 +112,6 @@ export function ContainerOverview({
                 {t("notes.list.newNote")}
               </button>
             )}
-
           </div>
         </div>
 

@@ -6,7 +6,6 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { useSystemAudioPermission } from "../../hooks/useSystemAudioPermission";
 import { canManageSystemAudioInApp } from "../../utils/systemAudioAccess";
 import googleCalendarIcon from "../../assets/icons/google-calendar.svg";
-import microsoftCalendarIcon from "../../assets/icons/microsoft-calendar.webp";
 import appleCalendarIcon from "../../assets/icons/apple-calendar.webp";
 import meetingDetectedPanel from "../../assets/onboarding-notes-meeting-detected.webp";
 
@@ -105,13 +104,6 @@ export default function CalendarConnectionsStep() {
       title: t("onboarding.rehaul.notes.connectors.googleTitle"),
       description: t("onboarding.rehaul.notes.connectors.googleDescription"),
       connected: store.gcalAccounts.length > 0,
-    },
-    {
-      id: "microsoft" as const,
-      icon: microsoftCalendarIcon,
-      title: t("onboarding.rehaul.notes.connectors.microsoftTitle"),
-      description: t("onboarding.rehaul.notes.connectors.microsoftDescription"),
-      connected: store.mcalAccounts.length > 0,
     },
     ...(isMac
       ? [

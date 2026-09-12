@@ -1426,7 +1426,8 @@
     },
     "view": {
       "customPrompt": "カスタムプロンプト",
-      "defaultPrompt": "デフォルトプロンプト","emptyPrompt": "プロンプトなし",
+      "defaultPrompt": "デフォルトプロンプト",
+      "emptyPrompt": "プロンプトなし",
       "modified": "変更済み"
     },
     "defaultTestInputTranslate": "今日はいい天気ですね、散歩に行きませんか？"
@@ -1802,6 +1803,18 @@
         "availableTitle": "組織の設定が利用できます",
         "availableDescription": "認証情報を管理せずに {{provider}} を使用できます。",
         "useManaged": "マネージドを使用"
+      },
+      "advanced": {
+        "localTimeoutHelp": "ローカル推論リクエストが中断されるまでの秒数。",
+        "localTimeoutLabel": "ローカルモデルのタイムアウト（llama.cpp）",
+        "maxTokensHelp": "生成されるトークンの上限。0 = 自動。",
+        "maxTokensLabel": "最大出力トークン数",
+        "retryHelp": "失敗したリクエストの後の再試行回数。0 = 1回のみ。",
+        "retryLabel": "再試行回数",
+        "secondsSuffix": "秒",
+        "timeoutHelp": "推論リクエストが中断されるまでの秒数。",
+        "timeoutLabel": "リクエストのタイムアウト",
+        "title": "詳細設定"
       }
     },
     "developer": {
@@ -2142,7 +2155,17 @@
     },
     "prompts": {
       "description": "テキスト補正と指示検出を行う統合システムプロンプトの表示、カスタマイズ、テスト",
-      "title": "プロンプトスタジオ"
+      "title": "プロンプトスタジオ",
+      "enhancementDescription": "生のノートを再構成して整えるためのシステムプロンプト。",
+      "enhancementTitle": "ノート整形プロンプト",
+      "meetingDescription": "2話者の会議文字起こしを整理されたアクションノートに変えるシステムプロンプト。",
+      "meetingTitle": "会議ノートのプロンプト",
+      "selectionEditDescription": "音声で選択テキストを編集するときに付加されるシステムサフィックス。",
+      "selectionEditTitle": "選択範囲編集プロンプト",
+      "titleGenerationDescription": "ノートのタイトルを自動生成するときに使うシステムプロンプト。",
+      "titleGenerationTitle": "タイトル生成プロンプト",
+      "toolInstructionsDescription": "チャットエージェントが呼び出せるツールの説明。空欄にするとツールごとの既定値が使われます。",
+      "toolInstructionsTitle": "エージェントのツール指示"
     },
     "speechToText": {
       "title": "音声認識",

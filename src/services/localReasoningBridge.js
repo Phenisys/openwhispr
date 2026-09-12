@@ -41,7 +41,6 @@ class LocalReasoningService {
         disableThinking: config.disableThinking !== false,
         requireCompleteOutput: config.requireCompleteOutput,
         timeoutMs: config.timeoutMs,
-
       };
 
       debugLogger.logReasoning("LOCAL_BRIDGE_INFERENCE", {

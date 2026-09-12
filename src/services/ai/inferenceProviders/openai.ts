@@ -212,116 +212,119 @@ export const openaiProvider: InferenceProvider = {
     }
 
     const retryStrategy = createApiRetryStrategy();
-    const response = await withRetry(async () => {
-      let lastError: Error | null = null;
-      let lastRetryableError: Error | null = null;
+    const response = await withRetry(
+      async () => {
+        let lastError: Error | null = null;
+        let lastRetryableError: Error | null = null;
 
-      for (const { url: endpoint, type } of endpointCandidates) {
-        const controller = new AbortController();
+        for (const { url: endpoint, type } of endpointCandidates) {
+          const controller = new AbortController();
+          const timeoutSeconds = getLlmRequestTimeoutSeconds();
           const timeoutId = setTimeout(
             () => controller.abort(),
             config.timeoutMs ?? getLlmRequestTimeoutSeconds() * 1000
           );
 
-        try {
-          const maxTokens =
-            config.maxTokens ||
-            Math.max(
-              4096,
-              ctx.calculateMaxTokens(
-                text.length,
-                TOKEN_LIMITS.MIN_TOKENS,
-                TOKEN_LIMITS.MAX_TOKENS,
-                TOKEN_LIMITS.TOKEN_MULTIPLIER
-              )
-            );
+          try {
+            const maxTokens =
+              config.maxTokens ||
+              Math.max(
+                4096,
+                ctx.calculateMaxTokens(
+                  text.length,
+                  TOKEN_LIMITS.MIN_TOKENS,
+                  TOKEN_LIMITS.MAX_TOKENS,
+                  TOKEN_LIMITS.TOKEN_MULTIPLIER
+                )
+              );
 
-          const requestBody: Record<string, unknown> = { model };
+            const requestBody: Record<string, unknown> = { model };
 
-          if (type === "responses") {
-            requestBody.input = buildMessages(type);
-            requestBody.store = false;
-            requestBody.max_output_tokens = maxTokens;
-            // A known endpoint host knows its own request shape better than the model id does.
-            const apiConfig = dialect ?? getOpenAiApiConfig(model, resolvedProvider);
-            if (apiConfig.supportsTemperature) {
-              requestBody.temperature = config.temperature ?? (config.systemPrompt ? 0.3 : 0);
+            if (type === "responses") {
+              requestBody.input = buildMessages(type);
+              requestBody.store = false;
+              requestBody.max_output_tokens = maxTokens;
+              // A known endpoint host knows its own request shape better than the model id does.
+              const apiConfig = dialect ?? getOpenAiApiConfig(model, resolvedProvider);
+              if (apiConfig.supportsTemperature) {
+                requestBody.temperature = config.temperature ?? (config.systemPrompt ? 0.3 : 0);
+              }
+            } else {
+              requestBody.messages = buildMessages(type);
+              applyChatCompletionsParams(requestBody, {
+                model,
+                provider: resolvedProvider,
+                endpoint: openAiBase,
+                config,
+                maxTokens,
+              });
             }
-          } else {
-            requestBody.messages = buildMessages(type);
-            applyChatCompletionsParams(requestBody, {
-              model,
-              provider: resolvedProvider,
-              endpoint: openAiBase,
-              config,
-              maxTokens,
-            });
-          }
 
-          const res = await fetchWithParamFallback(
-            () =>
-              fetch(endpoint, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-                },
-                body: JSON.stringify(requestBody),
-                signal: controller.signal,
-              }),
-            requestBody,
-            (details) => logger.logReasoning("OPENAI_PARAM_FALLBACK", { endpoint, ...details })
-          );
-
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({ error: res.statusText }));
-            const errorMessage = extractApiErrorMessage(
-              errorData,
-              `OpenAI API error: ${res.status}`
+            const res = await fetchWithParamFallback(
+              () =>
+                fetch(endpoint, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+                  },
+                  body: JSON.stringify(requestBody),
+                  signal: controller.signal,
+                }),
+              requestBody,
+              (details) => logger.logReasoning("OPENAI_PARAM_FALLBACK", { endpoint, ...details })
             );
 
-            const isUnsupportedEndpoint =
-              (res.status === 404 || res.status === 405) && type === "responses";
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ error: res.statusText }));
+              const errorMessage = extractApiErrorMessage(
+                errorData,
+                `OpenAI API error: ${res.status}`
+              );
 
-            if (isUnsupportedEndpoint) {
-              lastError = httpError(errorMessage, res.status);
-              rememberPreference(openAiBase, "chat");
+              const isUnsupportedEndpoint =
+                (res.status === 404 || res.status === 405) && type === "responses";
+
+              if (isUnsupportedEndpoint) {
+                lastError = httpError(errorMessage, res.status);
+                rememberPreference(openAiBase, "chat");
+                logger.logReasoning("OPENAI_ENDPOINT_FALLBACK", {
+                  attemptedEndpoint: endpoint,
+                  error: errorMessage,
+                });
+                continue;
+              }
+
+              throw httpError(errorMessage, res.status);
+            }
+
+            rememberPreference(openAiBase, type);
+            return res.json();
+          } catch (error) {
+            if ((error as Error).name === "AbortError") {
+              throw new Error(`Request timed out after ${timeoutSeconds}s`);
+            }
+            lastError = error as Error;
+            if (retryStrategy.shouldRetry(lastError)) {
+              lastRetryableError = lastError;
+            }
+            if (type === "responses") {
               logger.logReasoning("OPENAI_ENDPOINT_FALLBACK", {
                 attemptedEndpoint: endpoint,
-                error: errorMessage,
+                error: (error as Error).message,
               });
               continue;
             }
-
-            throw httpError(errorMessage, res.status);
+            throw lastRetryableError || error;
+          } finally {
+            clearTimeout(timeoutId);
           }
-
-          rememberPreference(openAiBase, type);
-          return res.json();
-        } catch (error) {
-          if ((error as Error).name === "AbortError") {
-            throw new Error(`Request timed out after ${timeoutSeconds}s`);
-          }
-          lastError = error as Error;
-          if (retryStrategy.shouldRetry(lastError)) {
-            lastRetryableError = lastError;
-          }
-          if (type === "responses") {
-            logger.logReasoning("OPENAI_ENDPOINT_FALLBACK", {
-              attemptedEndpoint: endpoint,
-              error: (error as Error).message,
-            });
-            continue;
-          }
-          throw lastRetryableError || error;
-        } finally {
-          clearTimeout(timeoutId);
         }
-      }
 
         throw lastRetryableError || lastError || new Error("No OpenAI endpoint responded");
-      }, { ...retryStrategy, maxRetries: config.maxRetries });
-
+      },
+      { ...retryStrategy, maxRetries: config.maxRetries }
+    );
 
     const isResponsesApi = Array.isArray(response?.output);
     const isChatCompletions = Array.isArray(response?.choices);

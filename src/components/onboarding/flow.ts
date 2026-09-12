@@ -198,9 +198,9 @@ export function createOnboardingResumeState(): OnboardingResumeState {
 export function createOnboardingSession(): OnboardingSession {
   return {
     version: ONBOARDING_FLOW_VERSION,
-    currentStepId: "auth",
+    currentStepId: "permissions",
     history: [],
-    authPath: null,
+    authPath: "guest",
     setupMode: null,
     selfHostedRequested: false,
     screenContextRequested: false,
@@ -221,17 +221,17 @@ export function resetOnboardingProgress(storage: OnboardingStorage): void {
 }
 
 export function getOnboardingRoute(context: OnboardingRouteContext): OnboardingStepId[] {
-  if (context.authPath === null) return ["auth"];
+  // Le fork n'a pas de compte : le parcours est toujours celui « sans authentification ».
+  // Les etapes de permissions et de raccourci restent obligatoires : finalizeOnboarding
+  // enregistre dictationHotkey de toute facon, et sauter ces etapes a deja livre des
+  // utilisateurs sans micro autorise ni raccourci connu.
+  const authPath: "guest" | "account" = context.authPath ?? "guest";
 
   const setupChoice = context.skipSetupChoice ? [] : (["setup-choice"] as OnboardingStepId[]);
 
   const route =
-    context.authPath === "guest"
-      ? // Guests still need the permission grants and a hotkey they have seen:
-        // finalizeOnboarding registers dictationHotkey either way, and skipping
-        // these steps shipped users who neither granted the mic nor knew their
-        // trigger key.
-        (["auth", "permissions", "dictation-hotkey", "setup-choice"] as OnboardingStepId[])
+    authPath === "guest"
+      ? (["permissions", "dictation-hotkey", "setup-choice"] as OnboardingStepId[])
       : [
           ...ACCOUNT_ROUTE,
           ...(context.agentAllowed
@@ -240,7 +240,7 @@ export function getOnboardingRoute(context: OnboardingRouteContext): OnboardingS
           ...setupChoice,
         ];
 
-  if (context.requiredModelsPending && context.authPath === "account") {
+  if (context.requiredModelsPending && authPath === "account") {
     route.splice(route.indexOf("auth") + 1, 0, "required-models");
   }
 
@@ -456,12 +456,12 @@ export function isRequiredModelsOnboardingStepActive(sessionValue: string | null
 }
 
 export function migrateLegacyOnboardingStep(value: string | null): OnboardingStepId {
-  if (!value) return "auth";
+  if (!value) return "permissions";
   if (isOnboardingStepId(value)) return value;
 
   const index = Number.parseInt(value, 10);
   if (!Number.isFinite(index) || index < 0) return "auth";
-  return LEGACY_STEP_MAP[Math.min(index, LEGACY_STEP_MAP.length - 1)] ?? "auth";
+  return LEGACY_STEP_MAP[Math.min(index, LEGACY_STEP_MAP.length - 1)] ?? "permissions";
 }
 
 /**

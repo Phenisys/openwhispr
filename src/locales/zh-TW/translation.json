@@ -1426,7 +1426,8 @@
     },
     "view": {
       "customPrompt": "自訂提示詞",
-      "defaultPrompt": "預設提示詞","emptyPrompt": "無提示詞",
+      "defaultPrompt": "預設提示詞",
+      "emptyPrompt": "無提示詞",
       "modified": "已修改"
     },
     "defaultTestInputTranslate": "今天天氣真好，要不要出去走走？"
@@ -1802,6 +1803,18 @@
         "availableTitle": "可使用組織設定",
         "availableDescription": "使用 {{provider}}，無需管理憑證。",
         "useManaged": "使用託管設定"
+      },
+      "advanced": {
+        "localTimeoutHelp": "本機推論請求被中止前的秒數。",
+        "localTimeoutLabel": "本機模型逾時（llama.cpp）",
+        "maxTokensHelp": "生成詞元的上限。0 = 自動。",
+        "maxTokensLabel": "最大輸出詞元數",
+        "retryHelp": "請求失敗後的重試次數。0 = 僅一次。",
+        "retryLabel": "重試次數",
+        "secondsSuffix": "秒",
+        "timeoutHelp": "推論請求被中止前的秒數。",
+        "timeoutLabel": "請求逾時",
+        "title": "進階"
       }
     },
     "developer": {
@@ -2142,7 +2155,17 @@
     },
     "prompts": {
       "description": "檢視、自訂和測試用於文字整理和指令偵測的統一系統提示詞",
-      "title": "提示詞工作室"
+      "title": "提示詞工作室",
+      "enhancementDescription": "用於重組和潤色原始筆記的系統提示詞。",
+      "enhancementTitle": "筆記潤色提示詞",
+      "meetingDescription": "用於把雙人會議轉寫整理成行動筆記的系統提示詞。",
+      "meetingTitle": "會議筆記提示詞",
+      "selectionEditDescription": "透過語音編輯所選文字時附加的系統後綴。",
+      "selectionEditTitle": "選區編輯提示詞",
+      "titleGenerationDescription": "自動產生筆記標題時使用的系統提示詞。",
+      "titleGenerationTitle": "標題生成提示詞",
+      "toolInstructionsDescription": "描述聊天代理可呼叫工具的說明。留空則保留每個工具的預設值。",
+      "toolInstructionsTitle": "代理工具說明"
     },
     "speechToText": {
       "title": "語音轉文字",

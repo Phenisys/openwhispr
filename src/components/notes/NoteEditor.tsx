@@ -16,15 +16,22 @@ import {
   Plus,
   Check,
   Users,
-} from "lucide-react";
+} from "../icons";
 import {
   canOrganizeNote,
   noteCapabilities,
   resolveNotePermission,
+  type NoteAclState,
 } from "../../lib/notePermissions";
 import {
+  useShareCacheEntry,
+  useNoteConflict,
   useSpaces,
+  clearNoteConflict,
   navigateToContainer,
+  persistNoteShareState,
+  updateNoteInStore,
+  updateShareCache,
 } from "../../stores/noteStore";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import type { Editor } from "@tiptap/react";
@@ -69,6 +76,13 @@ const SHARE_GROUP_CLASS =
   "flex h-[30px] items-stretch overflow-hidden rounded-full border border-border bg-surface-3 dark:border-white/10 dark:bg-surface-2";
 const SHARE_SEGMENT_CLASS =
   "flex items-center text-xs font-medium text-foreground/80 outline-none transition-colors duration-150 hover:bg-surface-raised hover:text-foreground focus-visible:bg-surface-raised dark:hover:bg-surface-3";
+
+/** Option d'export affichee dans le menu d'export de la note. */
+type NoteExportOption = {
+  id: string;
+  label: string;
+  onSelect: () => void;
+};
 
 const TRANSCRIPT_EXPORT_LABEL_KEYS = {
   txt: "notes.editor.asTranscriptText",
@@ -232,6 +246,10 @@ export default function NoteEditor({
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [isDiarizing, setIsDiarizing] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareIntent, setShareIntent] = useState<"open" | "copy-link">("open");
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const shareCache = useShareCacheEntry(note.cloud_id);
   const spaces = useSpaces();
   const space = useMemo(
     () => spaces.find((s) => s.id === note.space_id) ?? null,
@@ -241,25 +259,26 @@ export default function NoteEditor({
   // Persisted flag is the restart-safe truth; the live cache overlays it for
   // the current session (it reflects server state before the flag persists).
   const isShared = shareCache ? shareCache.share.visibility !== "private" : Boolean(note.is_shared);
-  const aclState: NoteAclState = shareCache
-    ? "loaded"
-    : !note.cloud_id || !isSignedIn
-      ? "unavailable"
-      : aclRequest?.cloudId === note.cloud_id
-        ? aclRequest.state
-        : "loading";
+  // Le partage de notes est retire avec la couche compte : aucune ACL distante.
+  const aclState: NoteAclState = "unavailable";
   const notePermission = resolveNotePermission({
-    cachedPermission: undefined,
-    aclState: "unavailable",
+    cachedPermission: shareCache?.access?.my_permission,
+    aclState,
     isTeamNote,
-    locallyOwned: ownsNote(note, user?.id),
+    locallyOwned: true,
   });
   const shareCapabilities = noteCapabilities(notePermission);
   const canEditNote = shareCapabilities.canEdit;
+  // Re-filing is owner-only on shared personal notes (a denied folder_id
+  // PATCH would fork an unexpected Personal copy); team members keep
+  // same-space folder moves.
   const canMoveToFolders = canOrganizeNote(notePermission, {
     isTeamNote,
     hasCloudCopy: Boolean(note.cloud_id),
   });
+  // A newer cloud copy arrived while this note had unpushed edits (plan §7.3).
+  const conflict = useNoteConflict(note.client_note_id);
+  const [conflictEditorName, setConflictEditorName] = useState<string | null>(null);
   const [diarizedSegments, setDiarizedSegments] = useState<TranscriptSegment[] | null>(null);
   const [speakerMappings, setSpeakerMappings] = useState<Record<string, string>>({});
   const [speakerProfiles, setSpeakerProfiles] = useState<
@@ -327,14 +346,14 @@ export default function NoteEditor({
     () =>
       collectKnownPeople(
         {
-          selfName: user?.name?.trim() || null,
-          selfEmail: user?.email?.trim() || null,
+          selfName: null,
+          selfEmail: null,
           participants: parsedParticipants,
         },
         speakerMappings,
         displaySegments
       ),
-    [user?.name, user?.email, parsedParticipants, speakerMappings, displaySegments]
+    [parsedParticipants, speakerMappings, displaySegments]
   );
 
   const refreshSpeakerProfiles = useCallback(() => {

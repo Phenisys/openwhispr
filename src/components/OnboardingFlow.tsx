@@ -1,28 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, CardContent } from "./ui/card";
-import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
-import {
-  ChevronRight,
-  ChevronLeft,
-  Check,
-  Flag,
-  Settings,
-  Shield,
-  Command,
-  Sparkles,
-  UserCircle,
-  Users,
-} from "lucide-react";
-import TitleBar from "./TitleBar";
-import WindowControls from "./WindowControls";
-import PermissionsSection from "./ui/PermissionsSection";
-import StepProgress from "./ui/StepProgress";
-import { AlertDialog, ConfirmDialog } from "./ui/dialog";
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { useLocalStorage } from "../hooks/useLocalStorage";
-import { useDialogs } from "../hooks/useDialogs";
+import { AlertCircle } from "./icons";
+import UseCaseStep from "./onboarding/UseCaseStep";
+import { hasUseCaseIntent } from "./onboarding/useCases";
+import OnboardingShell, { OnboardingStepHeader } from "./onboarding/OnboardingShell";
+import CompactPermissionsStep from "./onboarding/CompactPermissionsStep";
+import LanguageSelectionStep from "./onboarding/LanguageSelectionStep";
+import ShortcutSetupStep from "./onboarding/ShortcutSetupStep";
+import AssistantHotkeyPreview from "./onboarding/AssistantHotkeyPreview";
+import DemoStep from "./onboarding/DemoStep";
+import CalendarConnectionsStep from "./onboarding/CalendarConnectionsStep";
+import SetupChoiceStep from "./onboarding/SetupChoiceStep";
+import { ByokProviderStep, LocalModelSetupStep } from "./onboarding/ProviderSetupStep";
+import { RequiredModelDownloadStep } from "./onboarding/RequiredModelDownloadStep";
+import { AlertDialog } from "./ui/dialog";
 import { usePermissions } from "../hooks/usePermissions";
 import { useClipboard } from "../hooks/useClipboard";
 import { useScreenRecordingPermission } from "../hooks/useScreenRecordingPermission";
@@ -31,7 +22,6 @@ import { useSettings } from "../hooks/useSettings";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useHotkeyRegistration } from "../hooks/useHotkeyRegistration";
 import { useHotkeyModeInfo } from "../hooks/useHotkeyModeInfo";
-import { useWorkspace } from "../hooks/useWorkspace";
 import { useRequiredLocalModels } from "../hooks/useRequiredLocalModels";
 import { usePolicyStore } from "../stores/policyStore";
 import { isAgentAllowed, isScreenContextAllowed } from "../stores/policyRules";
@@ -48,16 +38,31 @@ import { getValidationMessage } from "../utils/hotkeyValidator";
 import { validateHotkeyForSlot } from "../utils/hotkeyValidation";
 import { getPlatform } from "../utils/platform";
 import { ACCESSIBILITY_SKIPPED_KEY, areRequiredPermissionsMet } from "../utils/permissions";
-import UseCaseStep from "./onboarding/UseCaseStep";
-import MeetingSetupStep from "./onboarding/MeetingSetupStep";
-import FinishStep from "./onboarding/FinishStep";
-import { USE_CASE_IDS } from "./onboarding/useCases";
-
-// Highest possible step index across flow variants (skip-auth with meeting step).
-const MAX_STEP_INDEX = 7;
-
-// Steps whose primary action is optional — the user can advance without it.
-const SKIPPABLE_STEPS = new Set(["usecase", "voiceAgent", "meeting"]);
+import logger from "../utils/logger";
+import {
+  COMPACT_STEPS,
+  getNextOnboardingStep,
+  getNotesFooterAction,
+  getOnboardingProgress,
+  getOnboardingRoute,
+  isSetupDecisionStep,
+  reconcileStepWithRoute,
+  resetOnboardingProgress,
+  resolveEnterpriseWorkspaceForOnboarding,
+  shouldInitializeMacAccessibilityFeatures,
+  shouldSkipOnboardingSetupChoice,
+  type OnboardingAuthDraft,
+  type OnboardingByokDraft,
+  type OnboardingLocalModelDraft,
+  type OnboardingResumeState,
+  type OnboardingSetupMode,
+  type OnboardingStepId,
+} from "./onboarding/flow";
+import { useOnboardingSession } from "./onboarding/useOnboardingSession";
+import { clearPendingLocalModels, hasPendingLocalModels } from "./onboarding/pendingLocalModels";
+import { resolveAssistantDemoScenario } from "./onboarding/assistantDemoScenario";
+import { ActivationModeSelector } from "./ui/ActivationModeSelector";
+import LinuxPttSetupInfo from "./ui/LinuxPttSetupInfo";
 
 interface OnboardingFlowProps {
   onComplete: (options?: { openSettings?: boolean }) => void;
@@ -82,21 +87,30 @@ function DemoHotkeyDescription({ text, hotkey }: { text: string; hotkey: string 
 
 export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const { t } = useTranslation();
+  const platform = getPlatform();
+  const agentAllowed = usePolicyStore(isAgentAllowed);
+  const screenContextAllowed = usePolicyStore(isScreenContextAllowed);
+  const settings = useSettings();
+  const settingsStore = useSettingsStore();
+  const {
+    session,
+    setSession,
+    goTo,
+    goBack,
+    setSetupMode,
+    setSelfHostedRequested,
+    setScreenContextRequested,
+    clearSession,
+  } = useOnboardingSession();
 
-  const [currentStep, setCurrentStep, removeCurrentStep] = useLocalStorage(
-    "onboardingCurrentStep",
-    0,
-    {
-      serialize: String,
-      deserialize: (value) => {
-        const parsed = parseInt(value, 10);
-        // Clamp to valid range to handle users upgrading from older versions
-        // with different step counts. The steps array is dynamic, so a second
-        // effect below clamps against the actual flow length.
-        if (isNaN(parsed) || parsed < 0) return 0;
-        return Math.min(parsed, MAX_STEP_INDEX);
-      },
-    }
+  const { dictationHotkeyConfirmed, assistantHotkeyConfirmed } = session.resume;
+  const [dictationHotkey, setDictationHotkey] = useState(() =>
+    resolveOnboardingDictationHotkey({
+      platform,
+      savedHotkey: parseHotkeyList(settings.dictationKey)[0] ?? "",
+      platformDefault: getDefaultHotkey(),
+      confirmed: dictationHotkeyConfirmed,
+    })
   );
   const [assistantHotkey, setAssistantHotkey] = useState(() =>
     resolveOnboardingAssistantHotkey(parseHotkeyList(settings.voiceAgentKey)[0] ?? "")
@@ -151,18 +165,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     (successful: boolean) => updateResumeFlag("assistantDemoCompleted", successful),
     [updateResumeFlag]
   );
-  const updateAuthResumeState = useCallback(
-    (patch: Partial<OnboardingAuthDraft>) => {
-      setSession((current) => ({
-        ...current,
-        resume: {
-          ...current.resume,
-          auth: { ...current.resume.auth, ...patch },
-        },
-      }));
-    },
-    [setSession]
-  );
 
   useClipboard((dialog) =>
     setPermissionAlert({ title: dialog.title, description: dialog.description })
@@ -179,48 +181,10 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     loaded: hotkeyModeLoaded,
   } = useHotkeyModeInfo("onboarding", dictationHotkey);
   const { activationMode, setActivationMode } = settings;
-  // This hook also starts the membership fetch for already-authenticated users;
-  // relying on the login transition alone would leave resumed onboarding stuck
-  // waiting for workspace resolution after an app restart.
-  const {
-    active: activeWorkspace,
-    workspaces,
-    loaded: workspacesLoaded,
-    setActive: setActiveWorkspace,
-  } = useWorkspace();
-  const enterpriseWorkspace = useMemo(
-    () => resolveEnterpriseWorkspaceForOnboarding(activeWorkspace, workspaces),
-    [activeWorkspace, workspaces]
-  );
-  const skipSetupChoiceForEnterprise = shouldSkipOnboardingSetupChoice({
-    isSignedIn,
-    authPath: session.authPath,
-    setupMode: session.setupMode,
-    activeWorkspace: enterpriseWorkspace,
-  });
-
-  useEffect(() => {
-    if (
-      workspacesLoaded &&
-      !activeWorkspace &&
-      skipSetupChoiceForEnterprise &&
-      enterpriseWorkspace
-    ) {
-      setActiveWorkspace(enterpriseWorkspace.id);
-    }
-  }, [
-    activeWorkspace,
-    enterpriseWorkspace,
-    setActiveWorkspace,
-    skipSetupChoiceForEnterprise,
-    workspacesLoaded,
-  ]);
-
-  const workspaceResolutionPending =
-    isSignedIn &&
-    session.authPath === "account" &&
-    (!workspacesLoaded ||
-      (!activeWorkspace && skipSetupChoiceForEnterprise && Boolean(enterpriseWorkspace)));
+  // Le fork n'a pas de compte : aucun espace d'entreprise a resoudre, et le choix de
+  // configuration ne peut donc jamais etre saute pour cause d'espace gere.
+  const skipSetupChoiceForEnterprise = false;
+  const workspaceResolutionPending = false;
   const hasConnectedCalendar =
     settingsStore.gcalAccounts.length > 0 ||
     settingsStore.mcalAccounts.length > 0 ||
@@ -474,21 +438,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     [settings, t]
   );
 
-  const syncUseCases = useCallback(() => {
-    if (!isSignedIn || session.authPath === "guest") return;
-    cloudPost("/api/onboarding-intent", {
-      useCases: settings.onboardingUseCases,
-      note: settings.onboardingUseCaseNote || undefined,
-      spokenLanguages: settings.spokenLanguages,
-    }).catch((error) => logger.warn("Failed to sync onboarding intent", { error }, "onboarding"));
-  }, [
-    isSignedIn,
-    session.authPath,
-    settings.onboardingUseCaseNote,
-    settings.onboardingUseCases,
-    settings.spokenLanguages,
-  ]);
-
   const finalizeOnboarding = useCallback(
     async (mode: OnboardingCompletionMode, options: { localPending?: boolean } = {}) => {
       if (isFinishing) return;
@@ -529,7 +478,8 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           clearPendingLocalModels();
         }
 
-        const skippedAuth = session.authPath === "guest";
+        // Sans compte dans le fork, le parcours est toujours « sans authentification ».
+        const skippedAuth = session.authPath !== "account";
         localStorage.setItem("authenticationSkipped", String(skippedAuth));
         localStorage.setItem("skipAuth", String(skippedAuth));
         clearSession();
@@ -652,8 +602,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       settings.setPreferredLanguage(
         settings.spokenLanguages.length === 1 ? settings.spokenLanguages[0] : "auto"
       );
-    } else if (currentStepId === "use-cases") {
-      syncUseCases();
     } else if (currentStepId === "dictation-hotkey") {
       const registered = await registerHotkey(withExtraDictationHotkeys(dictationHotkey));
       if (!registered) {
@@ -725,7 +673,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     setDictationHotkeyConfirmed,
     settings,
     settingsStore,
-    syncUseCases,
     t,
     withExtraDictationHotkeys,
     setupDecisionPending,
@@ -772,17 +719,23 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
   const renderStep = () => {
     switch (currentStepId) {
-      case "welcome":
+      case "required-models":
         return (
-          <div className="flex flex-col items-center justify-center gap-4 py-4 text-center">
-            <Sparkles className="w-10 h-10 text-primary/80" />
-            <h2 className="text-2xl font-semibold text-foreground">{t("onboarding.welcome.title")}</h2>
-            <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-              {t("onboarding.welcome.subtitle")}
-            </p>
-            <Button onClick={nextStep} className="mt-2 h-9 px-6 rounded-full text-sm">
-              {t("common.continue")}
-            </Button>
+          <div className="h-full w-full pt-2">
+            <OnboardingStepHeader
+              title={t("onboarding.requiredModels.title")}
+              wideTitle
+              description={t("onboarding.requiredModels.description", {
+                organization: t("onboarding.requiredModels.genericOrganization"),
+              })}
+            />
+            <RequiredModelDownloadStep
+              required={requiredModels.required}
+              missing={requiredModels.missing}
+              loading={requiredModels.loading}
+              refresh={requiredModels.refresh}
+              onProceed={() => void continueFromCurrentStep()}
+            />
           </div>
         );
 
@@ -801,14 +754,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   }
                 : undefined
             }
-            onBack={
-              session.history.length > 0
-                ? () => {
-                    setReturnedToAuth(true);
-                    goBack();
-                  }
-                : undefined
-            }
+            onBack={session.history.length > 0 ? goBack : undefined}
             onContinue={() => void continueFromCurrentStep()}
           />
         );
@@ -1048,13 +994,11 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               description={t("onboarding.rehaul.setupChoice.description")}
             />
             <SetupChoiceStep
-              isSignedIn={isSignedIn}
+              isSignedIn={false}
               agentAllowed={agentAllowed}
               onSelect={(mode, options) => void handleSetupSelection(mode, options)}
               onRequestAuthentication={() => {
                 setSetupMode("cloud");
-                setAuthPath(null);
-                goTo("auth");
               }}
             />
           </div>

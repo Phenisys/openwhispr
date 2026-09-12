@@ -29,12 +29,6 @@ import { isCacheableMicrophoneResolution, resolvePreferredMicrophone } from "./m
 import { isStaleDeviceError } from "./staleMicDevice";
 import { shouldSaveDiscardedRecording } from "./discardedRecording";
 import {
-  ANALYTICS_COUNTER_VERSION,
-  countSpokenWords,
-  localDateKey,
-  resolveAnalyticsMode,
-} from "./analytics";
-import {
   getSettings,
   useSettingsStore,
   getEffectiveCleanupModel,
@@ -67,10 +61,6 @@ import {
   resolveTranscriptionRoute,
   STREAMING_ONLY_PROVIDERS,
 } from "./transcriptionRoute.ts";
-import {
-  getManagedTranscriptionResolution,
-  isManagedTranscriptionActive,
-} from "../services/managedTranscription.ts";
 import { getTranscriptionApiKey } from "../services/fileTranscription";
 import { shouldSkipTranscriptionApiKey } from "./transcriptionAuth";
 import {
@@ -249,20 +239,20 @@ function resolveReasoningRoute(
       model: translation.model,
       cleanupReachable,
       cleanupConfig: {
-          inferenceScope: /** @type {const} */ ("dictationCleanup"),
-          disableThinking: settings.cleanupDisableThinking,
-          timeoutMs: settings.cleanupTimeoutMs,
-          maxTokens: settings.cleanupMaxTokens,
-          maxRetries: settings.cleanupMaxRetries,
-          // The chain's cleanup step is the same deterministic transform — see
-          // the cleanup route below for why the value has to be explicit.
-          temperature: 0,
-        },
-        config: {
-          ...translation.config,
-          timeoutMs: settings.translationTimeoutMs,
-          maxTokens: settings.translationMaxTokens,
-          maxRetries: settings.translationMaxRetries,
+        inferenceScope: /** @type {const} */ ("dictationCleanup"),
+        disableThinking: settings.cleanupDisableThinking,
+        timeoutMs: settings.cleanupTimeoutMs,
+        maxTokens: settings.cleanupMaxTokens,
+        maxRetries: settings.cleanupMaxRetries,
+        // The chain's cleanup step is the same deterministic transform — see
+        // the cleanup route below for why the value has to be explicit.
+        temperature: 0,
+      },
+      config: {
+        ...translation.config,
+        timeoutMs: settings.translationTimeoutMs,
+        maxTokens: settings.translationMaxTokens,
+        maxRetries: settings.translationMaxRetries,
 
         systemPrompt: resolvePrompt("translate", {
           agentName,
@@ -299,24 +289,23 @@ function resolveReasoningRoute(
       kind: "agent",
       model: target.model,
       config: {
-          ...target.config,
-          timeoutMs: settings.dictationAgentTimeoutMs,
-          maxTokens: settings.dictationAgentMaxTokens,
-          maxRetries: settings.dictationAgentMaxRetries,
-          systemPrompt: attach
-            ? appendScreenContextSuffix(systemPrompt, settings.uiLanguage)
-            : systemPrompt,
-          ...(attach ? { screenContext, textOnlySystemPrompt: systemPrompt } : {}),
-          // Selection edits run on this (dictation) scope, so they need it
-          // reachable; standalone commands resolve the same scope again in the
-          // panel and report their own configuration problems in-conversation.
-          selectionEditReachable: agent.reachable,
-          // Detection and stripping must resolve auto-language identically.
-          wakeWordLanguage,
-          // The panel re-decides attach/drop for its own request, so carry the
-          // raw screenshot past this attach gate for that path.
-          ...(screenContext ? { rawScreenContext: screenContext } : {}),
-
+        ...target.config,
+        timeoutMs: settings.dictationAgentTimeoutMs,
+        maxTokens: settings.dictationAgentMaxTokens,
+        maxRetries: settings.dictationAgentMaxRetries,
+        systemPrompt: attach
+          ? appendScreenContextSuffix(systemPrompt, settings.uiLanguage)
+          : systemPrompt,
+        ...(attach ? { screenContext, textOnlySystemPrompt: systemPrompt } : {}),
+        // Selection edits run on this (dictation) scope, so they need it
+        // reachable; standalone commands resolve the same scope again in the
+        // panel and report their own configuration problems in-conversation.
+        selectionEditReachable: agent.reachable,
+        // Detection and stripping must resolve auto-language identically.
+        wakeWordLanguage,
+        // The panel re-decides attach/drop for its own request, so carry the
+        // raw screenshot past this attach gate for that path.
+        ...(screenContext ? { rawScreenContext: screenContext } : {}),
       },
     };
   }
@@ -324,15 +313,14 @@ function resolveReasoningRoute(
     return {
       kind: "cleanup",
       config: {
-          inferenceScope: /** @type {const} */ ("dictationCleanup"),
-          disableThinking: settings.cleanupDisableThinking,
-          timeoutMs: settings.cleanupTimeoutMs,
-          maxTokens: settings.cleanupMaxTokens,
-          maxRetries: settings.cleanupMaxRetries,
-          // Cleanup is a deterministic transform: pass 0 explicitly, because the IPC-bridged
-          // providers (local bridge, Anthropic, enterprise) otherwise apply their own default.
-          temperature: 0,
-
+        inferenceScope: /** @type {const} */ ("dictationCleanup"),
+        disableThinking: settings.cleanupDisableThinking,
+        timeoutMs: settings.cleanupTimeoutMs,
+        maxTokens: settings.cleanupMaxTokens,
+        maxRetries: settings.cleanupMaxRetries,
+        // Cleanup is a deterministic transform: pass 0 explicitly, because the IPC-bridged
+        // providers (local bridge, Anthropic, enterprise) otherwise apply their own default.
+        temperature: 0,
       },
     };
   }
@@ -956,8 +944,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
   isRecordingAllowedByPolicy() {
     const policyState = usePolicyStore.getState();
     return (
-      (isManagedTranscriptionActive() ||
-        isTranscriptionContextAllowed(policyState, getSettings(), "dictation")) &&
+      isTranscriptionContextAllowed(policyState, getSettings(), "dictation") &&
       (!this.voiceAgentRequested || isAgentAllowed(policyState))
     );
   }
@@ -1938,16 +1925,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
       let result;
       let activeModel;
-      // Managed enterprise STT outranks the local and OpenWhispr Cloud lanes,
-      // matching the LLM scopes; users opt out via "Use personal setup" when
-      // the administrator allows it. Error resolutions fail closed inside
-      // processWithOpenAIAPI with their own code.
-      const managedTranscription = getManagedTranscriptionResolution();
-      if (managedTranscription) {
-        activeModel =
-          managedTranscription.kind === "managed" ? managedTranscription.deployment : null;
-        result = await this.processWithOpenAIAPI(audioBlob, metadata, wasCancelled);
-      } else if (useLocalWhisper) {
+      if (useLocalWhisper) {
         if (isSherpaLocalProvider(localProvider)) {
           activeModel = localProvider === "cohere" ? settings.cohereModel : parakeetModel;
           result = await this.processWithLocalParakeet(
@@ -3472,29 +3450,18 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         "transcription"
       );
 
-      // Managed enterprise STT outranks every personal setting.
-      const managedResolution = getManagedTranscriptionResolution();
-      if (managedResolution?.kind === "error") {
-        throw Object.assign(new Error(managedResolution.message), {
-          code: managedResolution.code,
-          messageKey: managedResolution.messageKey,
-        });
-      }
-
       // Route before reading a key: the resolver's fail-closed guards name the
       // real problem (a realtime-only provider, or its missing key), whereas the
       // key read blames the OpenAI key for a provider that never uses it.
-      const route = managedResolution ? null : this.resolveBatchRoute(apiSettings, model);
-      const apiKey = managedResolution ? null : await this.getAPIKey();
+      const route = this.resolveBatchRoute(apiSettings, model);
+      const apiKey = await this.getAPIKey();
       const optimizedAudio = audioBlob;
 
       // Dispatch before endpoint resolution (which defaults to OpenAI and would leak
       // the key). Self-hosted wins, so a leftover proxied provider isn't diverted here.
-      const proxySpec = managedResolution
-        ? MANAGED_TRANSCRIPTION_SPEC
-        : PROXY_TRANSCRIPTION_PROVIDERS[provider];
-      if (proxySpec && (managedResolution || !isSelfHostedTranscription(apiSettings))) {
-        const providerName = managedResolution ? "azure-managed" : provider;
+      const proxySpec = PROXY_TRANSCRIPTION_PROVIDERS[provider];
+      if (proxySpec && !isSelfHostedTranscription(apiSettings)) {
+        const providerName = provider;
         const call = proxySpec.ipc();
         if (!call) {
           throw new Error(`${proxySpec.displayName} transcription is unavailable in this window`);
@@ -4060,7 +4027,6 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           model: null,
         });
       }
-
     } catch (error) {
       logger.error(
         "Failed to save discarded transcription record",
@@ -4097,10 +4063,6 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
   shouldUseStreaming(isSignedInOverride) {
     const s = getSettings();
     if (s.useLocalWhisper) return false;
-
-    // Managed enterprise STT is batch-only and outranks personal streaming
-    // setups; an error resolution must fail closed on the batch path too.
-    if (getManagedTranscriptionResolution()) return false;
 
     // Self-hosted transcription is batch HTTP to the user's server, never cloud realtime WS.
     if (isSelfHostedTranscription(s)) return false;
@@ -4174,7 +4136,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       const provider = STREAMING_PROVIDERS[providerName];
       const [, wsResult] = await Promise.all([
         this.cacheMicrophoneDeviceId(),
-        (async () => {
+        async () => {
           const settings = getSettings();
           const res = await provider.warmup(
             buildStreamingSessionOptions({
@@ -4193,7 +4155,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
             throw err;
           }
           return res;
-        }),
+        },
       ]);
 
       if (wsResult.success) {

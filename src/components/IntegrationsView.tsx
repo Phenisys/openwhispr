@@ -18,14 +18,17 @@ import {
 import { useSettingsStore } from "../stores/settingsStore";
 import { useSystemAudioPermission } from "../hooks/useSystemAudioPermission";
 import { canManageSystemAudioInApp } from "../utils/systemAudioAccess";
+import type { CalendarAccount } from "../types/calendar";
 import CliIntegrationCard from "./CliIntegrationCard";
 import googleCalendarIcon from "../assets/icons/google-calendar.svg";
-import microsoftCalendarIcon from "../assets/icons/microsoft-calendar.svg";
 import appleCalendarIcon from "../assets/icons/apple-calendar.svg";
 
 const API_DOCS_URL = "https://docs.openwhispr.com/api/overview";
 
-interface IntegrationsViewProps {}
+interface IntegrationsViewProps {
+  isPaid: boolean;
+  onUpgrade: () => void;
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -373,24 +376,6 @@ export default function IntegrationsView({ isPaid, onUpgrade }: IntegrationsView
             onPrimaryOnlyChange={setGcalPrimaryOnly}
             isConnecting={isConnecting}
             onAddAnother={handleConnect}
-          />
-
-          <ProviderRow
-            icon={microsoftCalendarIcon}
-            i18nKey="integrations.microsoftCalendar"
-            connected={mcalAccounts.length > 0}
-            isConnecting={isMsConnecting}
-            onConnect={handleMicrosoftConnect}
-          />
-          <CalendarAccountRows
-            i18nKey="integrations.microsoftCalendar"
-            accounts={mcalAccounts}
-            disconnectingEmail={msDisconnectingEmail}
-            onUnlink={setConfirmMsDisconnectEmail}
-            primaryOnly={mcalPrimaryOnly}
-            onPrimaryOnlyChange={setMcalPrimaryOnly}
-            isConnecting={isMsConnecting}
-            onAddAnother={handleMicrosoftConnect}
           />
 
           {isMac && (

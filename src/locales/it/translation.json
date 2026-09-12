@@ -1426,7 +1426,8 @@
     },
     "view": {
       "customPrompt": "Prompt personalizzato",
-      "defaultPrompt": "Prompt predefinito","emptyPrompt": "Nessun prompt",
+      "defaultPrompt": "Prompt predefinito",
+      "emptyPrompt": "Nessun prompt",
       "modified": "Modificato"
     },
     "defaultTestInputTranslate": "Che bella giornata oggi, ti va di fare due passi?"
@@ -1802,6 +1803,18 @@
         "availableTitle": "Configurazione dell'organizzazione disponibile",
         "availableDescription": "Usa {{provider}} senza gestire credenziali.",
         "useManaged": "Usa la versione gestita"
+      },
+      "advanced": {
+        "localTimeoutHelp": "Secondi prima che una richiesta di inferenza locale venga annullata.",
+        "localTimeoutLabel": "Timeout del modello locale (llama.cpp)",
+        "maxTokensHelp": "Limite di token generati. 0 = automatico.",
+        "maxTokensLabel": "Token di output massimi",
+        "retryHelp": "Tentativi dopo una richiesta fallita. 0 = un solo tentativo.",
+        "retryLabel": "Tentativi di ripetizione",
+        "secondsSuffix": "s",
+        "timeoutHelp": "Secondi prima che una richiesta di inferenza venga annullata.",
+        "timeoutLabel": "Timeout della richiesta",
+        "title": "Avanzate"
       }
     },
     "developer": {
@@ -2142,7 +2155,17 @@
     },
     "prompts": {
       "description": "Visualizza, personalizza e testa il prompt di sistema unificato che gestisce la correzione del testo e il rilevamento delle istruzioni",
-      "title": "Prompt Studio"
+      "title": "Prompt Studio",
+      "enhancementDescription": "Prompt di sistema per ristrutturare e rifinire note grezze.",
+      "enhancementTitle": "Prompt di miglioramento delle note",
+      "meetingDescription": "Prompt di sistema per trasformare trascrizioni a due voci in note operative pulite.",
+      "meetingTitle": "Prompt delle note di riunione",
+      "selectionEditDescription": "Suffisso di sistema applicato quando si modifica una selezione vocale.",
+      "selectionEditTitle": "Prompt di modifica della selezione",
+      "titleGenerationDescription": "Prompt di sistema usato per generare automaticamente i titoli delle note.",
+      "titleGenerationTitle": "Prompt di generazione dei titoli",
+      "toolInstructionsDescription": "Istruzioni che descrivono gli strumenti che l'agente può chiamare. Lascia vuoto per mantenere i valori predefiniti per strumento.",
+      "toolInstructionsTitle": "Istruzioni degli strumenti dell'agente"
     },
     "speechToText": {
       "title": "Riconoscimento vocale",

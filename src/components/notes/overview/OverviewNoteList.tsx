@@ -25,7 +25,6 @@ export function OverviewNoteList({
   const { t } = useTranslation();
   const locale = useUiLocale();
 
-
   const groups = useMemo(() => groupItemsByDate(notes, (n) => n.updated_at, t), [notes, t]);
 
   if (notes.length === 0) {
@@ -76,9 +75,8 @@ export function OverviewNoteList({
                 <span className="text-[13px] text-foreground/85 truncate flex-1">
                   {note.title || t("notes.list.untitled")}
                 </span>
-                  <span className="text-[11px] text-foreground/45 dark:text-foreground/45 shrink-0 tabular-nums">
-                    {formatRelativeTime(note.updated_at, t, locale)}
-
+                <span className="text-[11px] text-foreground/45 dark:text-foreground/45 shrink-0 tabular-nums">
+                  {formatRelativeTime(note.updated_at, t, locale)}
                 </span>
               </button>
             );

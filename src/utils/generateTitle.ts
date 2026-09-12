@@ -2,7 +2,7 @@ import reasoningService from "../services/ReasoningService";
 import type { ReasoningConfig } from "../services/BaseReasoningService";
 import { getSettings } from "../stores/settingsStore";
 import { sanitizeGeneratedTitle } from "./sanitizeGeneratedTitle";
-
+import { resolvePrompt } from "../config/prompts";
 
 export async function generateNoteTitle(
   text: string,

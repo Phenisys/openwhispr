@@ -1519,7 +1519,8 @@
     },
     "view": {
       "customPrompt": "Benutzerdefinierter Prompt",
-      "defaultPrompt": "Standard-Prompt","emptyPrompt": "Kein Prompt",
+      "defaultPrompt": "Standard-Prompt",
+      "emptyPrompt": "Kein Prompt",
       "modified": "Geändert"
     },
     "defaultTestInputTranslate": "Das Wetter ist heute wunderschön, hast du Lust auf einen Spaziergang?"
@@ -2095,6 +2096,18 @@
         "availableTitle": "Einrichtung der Organisation verfügbar",
         "availableDescription": "{{provider}} ohne Verwaltung von Anmeldedaten nutzen.",
         "useManaged": "Verwaltet nutzen"
+      },
+      "advanced": {
+        "localTimeoutHelp": "Sekunden, bevor eine lokale Inferenzanfrage abgebrochen wird.",
+        "localTimeoutLabel": "Zeitlimit für lokale Modelle (llama.cpp)",
+        "maxTokensHelp": "Obergrenze für generierte Tokens. 0 = automatisch.",
+        "maxTokensLabel": "Maximale Ausgabe-Tokens",
+        "retryHelp": "Wiederholungen nach einer fehlgeschlagenen Anfrage. 0 = ein Versuch.",
+        "retryLabel": "Wiederholungsversuche",
+        "secondsSuffix": "s",
+        "timeoutHelp": "Sekunden, bevor eine Inferenzanfrage abgebrochen wird.",
+        "timeoutLabel": "Zeitlimit für Anfragen",
+        "title": "Erweitert"
       }
     },
     "developer": {
@@ -2435,7 +2448,17 @@
     },
     "prompts": {
       "description": "Den einheitlichen System-Prompt anzeigen, anpassen und testen, der Textbereinigung und Anweisungserkennung steuert",
-      "title": "Prompt-Studio"
+      "title": "Prompt-Studio",
+      "enhancementDescription": "System-Prompt zum Umstrukturieren und Polieren roher Notizen.",
+      "enhancementTitle": "Prompt zur Notizverbesserung",
+      "meetingDescription": "System-Prompt, der Transkripte mit zwei Sprechern in saubere Aktionsnotizen verwandelt.",
+      "meetingTitle": "Prompt für Meeting-Notizen",
+      "selectionEditDescription": "System-Suffix, das beim Bearbeiten einer Textauswahl per Stimme angehängt wird.",
+      "selectionEditTitle": "Prompt zur Auswahlbearbeitung",
+      "titleGenerationDescription": "System-Prompt für die automatische Erzeugung von Notiztiteln.",
+      "titleGenerationTitle": "Prompt zur Titelerzeugung",
+      "toolInstructionsDescription": "Anweisungen, welche Tools der Chat-Agent aufrufen darf. Leer lassen, um die Standardwerte je Tool zu behalten.",
+      "toolInstructionsTitle": "Tool-Anweisungen des Agenten"
     },
     "speechToText": {
       "title": "Spracherkennung",

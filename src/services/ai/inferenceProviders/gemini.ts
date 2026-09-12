@@ -72,72 +72,76 @@ export const geminiProvider: InferenceProvider = {
       generationConfig,
     };
 
-    const response = await withRetry(async () => {
-      logger.logReasoning("GEMINI_REQUEST", {
-        endpoint: `${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`,
-        model,
-        hasApiKey: !!apiKey,
-        hasScreenContext: !!config.screenContext,
-        // A short prompt could let the 200-char preview reach into the base64
-        // image part — preview the text part only, never the full body.
-        requestBody: JSON.stringify({
-          ...requestBody,
-          contents: [{ parts: [parts[0]] }],
-        }).substring(0, 200),
-      });
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        config.timeoutMs ?? getLlmRequestTimeoutSeconds() * 1000
-      );
-
-      try {
-        const res = await fetch(`${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
+    const response = await withRetry(
+      async () => {
+        logger.logReasoning("GEMINI_REQUEST", {
+          endpoint: `${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`,
+          model,
+          hasApiKey: !!apiKey,
+          hasScreenContext: !!config.screenContext,
+          // A short prompt could let the 200-char preview reach into the base64
+          // image part — preview the text part only, never the full body.
+          requestBody: JSON.stringify({
+            ...requestBody,
+            contents: [{ parts: [parts[0]] }],
+          }).substring(0, 200),
         });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          let errorData: { error?: { message?: string } | string; message?: string } = {
-            error: res.statusText,
-          };
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || res.statusText };
-          }
+        const controller = new AbortController();
+        const timeoutSeconds = getLlmRequestTimeoutSeconds();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          config.timeoutMs ?? timeoutSeconds * 1000
+        );
 
-          logger.logReasoning("GEMINI_API_ERROR_DETAIL", {
-            status: res.status,
-            statusText: res.statusText,
-            error: errorData,
-            fullResponse: errorText.substring(0, 500),
+        try {
+          const res = await fetch(`${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
           });
 
-          const errMsg = extractApiErrorMessage(errorData, `Gemini API error: ${res.status}`);
-          throw httpError(errMsg, res.status);
-        }
+          if (!res.ok) {
+            const errorText = await res.text();
+            let errorData: { error?: { message?: string } | string; message?: string } = {
+              error: res.statusText,
+            };
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText || res.statusText };
+            }
 
-        const jsonResponse = (await res.json()) as GeminiResponse;
-        logger.logReasoning("GEMINI_RAW_RESPONSE", {
-          hasResponse: !!jsonResponse,
-          hasCandidates: !!jsonResponse?.candidates,
-          candidatesLength: jsonResponse?.candidates?.length || 0,
-        });
-        return jsonResponse;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          throw new Error(`Request timed out after ${timeoutSeconds}s`);
+            logger.logReasoning("GEMINI_API_ERROR_DETAIL", {
+              status: res.status,
+              statusText: res.statusText,
+              error: errorData,
+              fullResponse: errorText.substring(0, 500),
+            });
+
+            const errMsg = extractApiErrorMessage(errorData, `Gemini API error: ${res.status}`);
+            throw httpError(errMsg, res.status);
+          }
+
+          const jsonResponse = (await res.json()) as GeminiResponse;
+          logger.logReasoning("GEMINI_RAW_RESPONSE", {
+            hasResponse: !!jsonResponse,
+            hasCandidates: !!jsonResponse?.candidates,
+            candidatesLength: jsonResponse?.candidates?.length || 0,
+          });
+          return jsonResponse;
+        } catch (error) {
+          if ((error as Error).name === "AbortError") {
+            throw new Error(`Request timed out after ${timeoutSeconds}s`);
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
         }
-        throw error;
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
+      },
+      { ...createApiRetryStrategy(), maxRetries: config.maxRetries }
+    );
 
     const candidate = response.candidates?.[0];
     if (config.requireCompleteOutput && candidate?.finishReason === "MAX_TOKENS") {

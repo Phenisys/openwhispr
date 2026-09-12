@@ -18,7 +18,6 @@ import { getLlmRequestTimeoutSeconds } from "../helpers/llmRequestTimeout.js";
 import { streamText, stepCountIs } from "ai";
 import { getAIModel } from "./ai/providers";
 import { createEnterpriseChatModel } from "./ai/enterpriseChatModel";
-import { getManagedScopeResolution } from "../stores/enterpriseIdentityStore";
 import type { InferenceScope } from "../config/inferenceScopes";
 import { PROVIDER_REGISTRY, type ProviderContext } from "./ai/inferenceProviders";
 import {
@@ -147,29 +146,7 @@ class ReasoningService extends BaseReasoningService {
     fallbackScope: InferenceScope
   ): { model: string; provider: P; config: T; isManaged: boolean } {
     const inferenceScope = config.inferenceScope || fallbackScope;
-    const managed = getManagedScopeResolution(inferenceScope, getSettings().enterpriseSetupMode);
-    if (managed.kind === "error") {
-      throw Object.assign(new Error(managed.message), {
-        code: managed.code,
-        messageKey: managed.messageKey,
-      });
-    }
-    if (managed.kind !== "managed") {
-      return { model, provider, config: { ...config, inferenceScope }, isManaged: false };
-    }
-    return {
-      model: managed.model,
-      provider: managed.provider as P,
-      config: {
-        ...config,
-        inferenceScope,
-        provider: managed.provider,
-        lanUrl: undefined,
-        baseUrl: undefined,
-        customApiKey: undefined,
-      },
-      isManaged: true,
-    };
+    return { model, provider, config: { ...config, inferenceScope }, isManaged: false };
   }
 
   private async getApiKey(
@@ -323,86 +300,90 @@ class ReasoningService extends BaseReasoningService {
     });
 
     const requestGeneration = this.requestCancellationGeneration;
-    const response = await withRetry(async () => {
-      if (requestGeneration !== this.requestCancellationGeneration) {
-        throw httpError("Request cancelled", 499);
-      }
-      const controller = new AbortController();
+    const response = await withRetry(
+      async () => {
+        if (requestGeneration !== this.requestCancellationGeneration) {
+          throw httpError("Request cancelled", 499);
+        }
+        const controller = new AbortController();
         this.activeRequestControllers.add(controller);
+        const timeoutSeconds = getLlmRequestTimeoutSeconds();
         const timeoutId = setTimeout(
           () => controller.abort(),
-          config.timeoutMs ?? getLlmRequestTimeoutSeconds() * 1000
+          config.timeoutMs ?? timeoutSeconds * 1000
         );
 
-      try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        if (apiKey) {
-          headers["Authorization"] = `Bearer ${apiKey}`;
-        }
-
-        const res = await fetchWithParamFallback(
-          () =>
-            fetch(endpoint, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(requestBody),
-              signal: controller.signal,
-            }),
-          requestBody,
-          logParamFallback(`${providerName.toUpperCase()}_PARAM_FALLBACK`)
-        );
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          let errorData: any = { error: res.statusText };
-
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || res.statusText };
+        try {
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (apiKey) {
+            headers["Authorization"] = `Bearer ${apiKey}`;
           }
 
-          const errorMessage = extractApiErrorMessage(
-            errorData,
-            `${providerName} API error: ${res.status}`
+          const res = await fetchWithParamFallback(
+            () =>
+              fetch(endpoint, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+              }),
+            requestBody,
+            logParamFallback(`${providerName.toUpperCase()}_PARAM_FALLBACK`)
           );
 
-          logger.logReasoning(`${providerName.toUpperCase()}_API_ERROR_DETAIL`, {
-            status: res.status,
-            statusText: res.statusText,
-            error: errorData,
-            errorMessage,
-            fullResponse: errorText.substring(0, 500),
-          });
-          throw httpError(errorMessage, res.status);
-        }
+          if (!res.ok) {
+            const errorText = await res.text();
+            let errorData: any = { error: res.statusText };
 
-        const jsonResponse = await res.json();
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText || res.statusText };
+            }
 
-        logger.logReasoning(`${providerName.toUpperCase()}_RAW_RESPONSE`, {
-          hasResponse: !!jsonResponse,
-          responseKeys: jsonResponse ? Object.keys(jsonResponse) : [],
-          hasChoices: !!jsonResponse?.choices,
-          choicesLength: jsonResponse?.choices?.length || 0,
-          fullResponse: JSON.stringify(jsonResponse).substring(0, 500),
-        });
+            const errorMessage = extractApiErrorMessage(
+              errorData,
+              `${providerName} API error: ${res.status}`
+            );
 
-        return jsonResponse;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          if (requestGeneration !== this.requestCancellationGeneration) {
-            throw httpError("Request cancelled", 499);
+            logger.logReasoning(`${providerName.toUpperCase()}_API_ERROR_DETAIL`, {
+              status: res.status,
+              statusText: res.statusText,
+              error: errorData,
+              errorMessage,
+              fullResponse: errorText.substring(0, 500),
+            });
+            throw httpError(errorMessage, res.status);
           }
-          throw new Error(`Request timed out after ${timeoutSeconds}s`);
+
+          const jsonResponse = await res.json();
+
+          logger.logReasoning(`${providerName.toUpperCase()}_RAW_RESPONSE`, {
+            hasResponse: !!jsonResponse,
+            responseKeys: jsonResponse ? Object.keys(jsonResponse) : [],
+            hasChoices: !!jsonResponse?.choices,
+            choicesLength: jsonResponse?.choices?.length || 0,
+            fullResponse: JSON.stringify(jsonResponse).substring(0, 500),
+          });
+
+          return jsonResponse;
+        } catch (error) {
+          if ((error as Error).name === "AbortError") {
+            if (requestGeneration !== this.requestCancellationGeneration) {
+              throw httpError("Request cancelled", 499);
+            }
+            throw new Error(`Request timed out after ${timeoutSeconds}s`);
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
+          this.activeRequestControllers.delete(controller);
         }
-        throw error;
-      } finally {
-        clearTimeout(timeoutId);
-        this.activeRequestControllers.delete(controller);
-      }
-    }, { ...createApiRetryStrategy(), maxRetries: config.maxRetries });
+      },
+      { ...createApiRetryStrategy(), maxRetries: config.maxRetries }
+    );
 
     if (!response.choices || !response.choices[0]) {
       logger.logReasoning(`${providerName.toUpperCase()}_RESPONSE_ERROR`, {
@@ -632,14 +613,16 @@ class ReasoningService extends BaseReasoningService {
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-      const timeoutSeconds = getLlmRequestTimeoutSeconds({ streaming: true });
-      let timeoutTriggered = false;
-      const timeoutId = setTimeout(() => {
+    const timeoutSeconds = getLlmRequestTimeoutSeconds({ streaming: true });
+    let timeoutTriggered = false;
+    const timeoutId = setTimeout(
+      () => {
         if (abortController.signal.aborted) return;
         timeoutTriggered = true;
         abortController.abort();
-      }, config.timeoutMs ?? timeoutSeconds * 1000);
-
+      },
+      config.timeoutMs ?? timeoutSeconds * 1000
+    );
 
     let response: Response;
     try {
@@ -1200,15 +1183,6 @@ class ReasoningService extends BaseReasoningService {
   async isAvailable(): Promise<boolean> {
     try {
       const settings = getSettings();
-      // Mirrors processText's precedence: managed access outranks every manual route.
-      if (
-        getManagedScopeResolution("dictationCleanup", settings.enterpriseSetupMode).kind ===
-        "managed"
-      ) {
-        logger.logReasoning("API_KEY_CHECK", { managedEnterprise: true });
-        return true;
-      }
-
       if (isCloudCleanupMode()) {
         logger.logReasoning("API_KEY_CHECK", { cloudCleanupMode: true });
         return true;

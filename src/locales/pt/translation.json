@@ -1405,7 +1405,8 @@
     },
     "view": {
       "customPrompt": "Prompt personalizado",
-      "defaultPrompt": "Prompt padrão","emptyPrompt": "Sem prompt",
+      "defaultPrompt": "Prompt padrão",
+      "emptyPrompt": "Sem prompt",
       "modified": "Modificado"
     },
     "defaultTestInputTranslate": "O tempo está lindo hoje, quer dar um passeio?"
@@ -1781,6 +1782,18 @@
         "availableTitle": "Configuração da organização disponível",
         "availableDescription": "Use {{provider}} sem gerenciar credenciais.",
         "useManaged": "Usar gerenciado"
+      },
+      "advanced": {
+        "localTimeoutHelp": "Segundos antes de uma requisição de inferência local ser cancelada.",
+        "localTimeoutLabel": "Tempo limite do modelo local (llama.cpp)",
+        "maxTokensHelp": "Limite de tokens gerados. 0 = automático.",
+        "maxTokensLabel": "Tokens de saída máximos",
+        "retryHelp": "Tentativas após uma requisição falhada. 0 = tentativa única.",
+        "retryLabel": "Tentativas de repetição",
+        "secondsSuffix": "s",
+        "timeoutHelp": "Segundos antes de uma requisição de inferência ser cancelada.",
+        "timeoutLabel": "Tempo limite da requisição",
+        "title": "Avançado"
       }
     },
     "developer": {
@@ -2121,7 +2134,17 @@
     },
     "prompts": {
       "description": "Visualize, personalize e teste o prompt de sistema unificado que alimenta a limpeza de texto e a detecção de instruções",
-      "title": "Estúdio de prompts"
+      "title": "Estúdio de prompts",
+      "enhancementDescription": "Prompt de sistema para reestruturar e polir notas em bruto.",
+      "enhancementTitle": "Prompt de melhoria de notas",
+      "meetingDescription": "Prompt de sistema para transformar transcrições de dois falantes em notas de ação limpas.",
+      "meetingTitle": "Prompt de notas de reunião",
+      "selectionEditDescription": "Sufixo de sistema aplicado ao editar uma seleção de texto por voz.",
+      "selectionEditTitle": "Prompt de edição de seleção",
+      "titleGenerationDescription": "Prompt de sistema usado ao gerar títulos de notas automaticamente.",
+      "titleGenerationTitle": "Prompt de geração de títulos",
+      "toolInstructionsDescription": "Instruções que descrevem as ferramentas que o agente pode chamar. Deixe vazio para manter os padrões de cada ferramenta.",
+      "toolInstructionsTitle": "Instruções de ferramentas do agente"
     },
     "speechToText": {
       "title": "Voz para texto",

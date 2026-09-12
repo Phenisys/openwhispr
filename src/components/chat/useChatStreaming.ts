@@ -271,15 +271,9 @@ export function useChatStreaming({
       const isCustomAgent = llmMode === "providers" && llmConfig.provider === "custom";
       const isLocalProvider =
         !isEnterpriseProvider(llmConfig.provider) &&
-        ![
-          "openai",
-          "groq",
-          "custom",
-          "anthropic",
-          "gemini",
-          "tinfoil",
-          "openrouter",
-          ].includes(llmConfig.provider);
+        !["openai", "groq", "custom", "anthropic", "gemini", "tinfoil", "openrouter"].includes(
+          llmConfig.provider
+        );
 
       const localModelCanUseTool =
         isLocalProvider && estimateModelSizeB(llmConfig.model) >= LOCAL_TOOL_MIN_PARAMS_B;
@@ -442,12 +436,11 @@ export function useChatStreaming({
               lanUrl: isLanAgent ? llmConfig.remoteUrl : undefined,
               baseUrl: isCustomAgent ? llmConfig.cloudBaseUrl || undefined : undefined,
               customApiKey:
-                  isCustomAgent || isLanAgent ? llmConfig.customApiKey || undefined : undefined,
-                disableThinking: llmConfig.disableThinking,
-                timeoutMs: settings.chatAgentTimeoutMs,
-                maxTokens: settings.chatAgentMaxTokens,
-                maxRetries: settings.chatAgentMaxRetries,
-
+                isCustomAgent || isLanAgent ? llmConfig.customApiKey || undefined : undefined,
+              disableThinking: llmConfig.disableThinking,
+              timeoutMs: settings.chatAgentTimeoutMs,
+              maxTokens: settings.chatAgentMaxTokens,
+              maxRetries: settings.chatAgentMaxRetries,
             },
             aiTools
           );
