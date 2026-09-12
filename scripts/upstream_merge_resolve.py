@@ -13,8 +13,10 @@ Usage :
   scripts/upstream_merge_resolve.py            # applique le manifeste
   scripts/upstream_merge_resolve.py --check    # rapport seul, aucune mutation
 
-Codes de sortie : 0 = résolution mécanique OK ; 1 = violation d'assertion ;
-2 = des conflits de contenu subsistent (normal, à arbitrer à la main).
+Codes de sortie : 0 = résolution mécanique OK ; 1 = violation d'assertion (un
+chemin interdit subsiste, ou une importation relative pointe vers une cible
+absente du disque) ; 2 = des conflits de contenu subsistent (normal, à arbitrer
+à la main).
 """
 from __future__ import annotations
 
@@ -25,7 +27,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-CODE_EXT = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".json", ".yml", ".yaml")
+CODE_EXT = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx")
+RESOLVE_EXT = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".json")
+SKIP_DIRS = {".git", "node_modules", "dist", "build", ".worktrees", "out"}
+
+# `require("…")`, `import … from "…"`, `import("…")`, `import "…"`.
+SPEC_RE = re.compile(r"""(?:require\s*\(\s*|from\s+|import\s*\(\s*|import\s+)['"]([^'"]+)['"]""")
+# Les littéraux gabarits sont retirés avant le scan : les générateurs de code
+# (scripts/sync-nucleo-icons.js) contiennent des `from "./createIcon"` qui ne
+# sont pas des importations de ce fichier.
+TEMPLATE_RE = re.compile(r"`(?:[^`\\]|\\.)*`", re.S)
+
+
+def blank_templates(text):
+    """Neutralise les littéraux gabarits en conservant le numérotage des lignes."""
+    return TEMPLATE_RE.sub(lambda m: "``" + "\n" * m.group(0).count("\n"), text)
 
 
 def run(args, cwd=None):
@@ -58,6 +74,64 @@ def parse_manifest(path):
         elif section == "warn":
             warn.append(line)
     return purged, excluded, warn
+
+
+def code_files(repo):
+    """Fichiers de code de l'arbre, hors dépendances et artefacts de build."""
+    root = Path(repo)
+    for path in root.rglob("*"):
+        if not path.is_file() or path.suffix not in CODE_EXT:
+            continue
+        rel = path.relative_to(root)
+        if any(part in SKIP_DIRS for part in rel.parts):
+            continue
+        yield rel, path
+
+
+def resolves(base, spec):
+    """Résout un specifier relatif comme le fait le bundleur.
+
+    `git grep`/le nom de fichier ne suffisent pas : une même cible s'écrit
+    `./x`, `./x.js` (le TS autorise l'extension `.js` pour un fichier `.ts`),
+    `x/index`, `x.ts`… Toute variante non résolue est une importation cassée.
+    """
+    cands = [spec]
+    # extension explicite qui ne correspond pas au fichier réel (TS/ESM)
+    if spec.endswith((".js", ".mjs", ".cjs", ".jsx")):
+        stem = spec.rsplit(".", 1)[0]
+        cands += [stem + ".ts", stem + ".tsx", stem + ".js", stem + ".jsx"]
+    for ext in RESOLVE_EXT:
+        cands.append(spec + ext)
+        cands.append(spec.rstrip("/") + "/index" + ext)
+    return any((base / c).is_file() for c in cands)
+
+
+def scan_dangling_specifiers(repo):
+    """Importations relatives dont la cible n'existe pas sur le disque.
+
+    C'est l'assertion qui compte après une fusion : `typecheck` ne voit que le
+    projet TS de `src`, `lint` est statique et le build du renderer ne charge
+    jamais le processus principal, qui s'exécute non groupé depuis `main.js`.
+    Un `require("./<module purgé>")` y survivait donc à toutes les gardes vertes
+    et tuait le démarrage de l'application.
+    """
+    dangling = {}
+    for rel, path in code_files(repo):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "`" in text:
+            text = blank_templates(text)
+        for match in SPEC_RE.finditer(text):
+            spec = match.group(1)
+            if not (spec.startswith("./") or spec.startswith("../")):
+                continue
+            if resolves(path.parent, spec):
+                continue
+            line = text[: match.start()].count("\n") + 1
+            dangling.setdefault(str(rel), []).append((line, spec))
+    return dangling
 
 
 def main():
@@ -125,41 +199,24 @@ def main():
     else:
         print("   OK : aucun chemin du manifeste n'est présent (%d vérifiés)" % len(forbidden))
 
-    # références orphelines laissées par les suppressions : on agrège par
-    # fichier référent, car l'unité de travail est « quel fichier survivant
-    # pointe encore sur un module supprimé », pas la liste des occurrences.
-    removed_paths = sorted(set(mechanical) | set(silent)) or forbidden
-    stems = {}
-    for p in removed_paths:
-        stems.setdefault(Path(p).stem, p)
-    referrers = {}
-    if stems:
-        pattern = "|".join(re.escape(s) for s in sorted(stems, key=len, reverse=True) if len(s) >= 4)
-        out, _err, rc = run(["git", "-C", repo, "grep", "-n", "-I", "-E", pattern,
-                             "--", "*.js", "*.mjs", "*.cjs", "*.ts", "*.tsx", "*.jsx"])
-        if rc == 0:
-            spec_re = re.compile(r"""["'`]([^"'`]+)["'`]""")
-            for line in out.splitlines():
-                path, _sep, rest = line.partition(":")
-                if path in ("".join(removed_paths),) or path in set(removed_paths):
-                    continue
-                for spec in spec_re.findall(rest):
-                    stem = Path(spec).stem
-                    if stem in stems:
-                        referrers.setdefault(path, set()).add(stem)
-
-    if referrers:
-        total_refs = sum(len(v) for v in referrers.values())
-        print("   ATTENTION : %d fichier(s) survivant(s) pointent encore vers un module supprimé"
-              % len(referrers))
-        print("      soit %d référence(s) de module à retirer du câblage (le build en révélera d'autres) :"
-              % total_refs)
-        for path in sorted(referrers, key=lambda k: (-len(referrers[k]), k))[:40]:
-            mods = sorted(referrers[path])
-            print("      %-52s %2d module(s) : %s"
-                  % (path, len(mods), ", ".join(mods[:4]) + ("…" if len(mods) > 4 else "")))
+    # Références orphelines laissées par les suppressions : pour chaque
+    # importation RELATIVE présente dans l'arbre, la cible est résolue sur le
+    # disque. Aucun rapprochement par nom de fichier ou par chaîne : un
+    # identifiant de fournisseur ("corti") n'est pas une importation de
+    # `corti.ts`, et un module supprimé peut être cité en commentaire sans que
+    # le fichier soit cassé.
+    dangling = scan_dangling_specifiers(repo)
+    if dangling:
+        total = sum(len(v) for v in dangling.values())
+        print("   ECHEC : %d fichier(s) importent %d cible(s) absente(s) du disque :"
+              % (len(dangling), total))
+        for path in sorted(dangling, key=lambda k: (-len(dangling[k]), k)):
+            for lineno, spec in dangling[path][:20]:
+                print("      %s:%d  %s" % (path, lineno, spec))
+            if len(dangling[path]) > 20:
+                print("      %s  … %d de plus" % (path, len(dangling[path]) - 20))
     else:
-        print("   OK : aucune référence orpheline de module détectée")
+        print("   OK : aucune importation relative ne pointe vers une cible absente")
 
     # alertes non destructives sur les motifs
     tracked = [l for l in git(repo, "ls-files").splitlines() if l.strip()]
@@ -180,7 +237,7 @@ def main():
           "&& npm run typecheck && npm run build:renderer")
     print("  puis : PR pour merge humain")
 
-    if present or failures:
+    if present or failures or dangling:
         return 1
     if content:
         return 2

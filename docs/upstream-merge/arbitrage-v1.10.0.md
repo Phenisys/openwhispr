@@ -101,4 +101,17 @@ nvm exec 24 npm ci && nvm exec 24 npm test && nvm exec 24 npm run lint \
   && nvm exec 24 npm run typecheck && nvm exec 24 npm run build:renderer
 ```
 
-Puis le nettoyage du câblage : `scripts/upstream_merge_resolve.py` liste les **141** fichiers survivants qui référencent encore **259** modules supprimés (c'est la conséquence attendue d'avoir pris les versions amont) ; le build et les tests guident le reste.
+Puis le nettoyage du câblage : `scripts/upstream_merge_resolve.py` liste les fichiers qui
+importent encore une cible absente du disque (chaque importation relative est résolue sur
+le disque, extensions implicites et `index` compris) ; le build et les tests guident le reste.
+
+> **2026-09-12 — mesure corrigée.** La première version du résolveur rapprochait les
+> références par *stem* de fichier trouvé dans n'importe quelle chaîne : elle annonçait
+> **141** fichiers / **259** références, dont l'essentiel était faux (l'identifiant de
+> fournisseur `"corti"` comptait comme un import de `corti.ts`, et le mot `openwhispr`
+> comme un import de `openwhispr.ts`). Le scan résout désormais chaque specifier relatif
+> sur le disque : **12 imports réellement cassés dans 7 fichiers** ont été corrigés, dont
+> sept dans le processus principal (`main.js`, `ipcHandlers.js`, `googleCalendarOAuth.js`,
+> `enterpriseAiProviders.js`) qui empêchaient l'application de démarrer. L'assertion est
+> devenue bloquante (code de sortie 1) et un test la rejoue à chaque `npm test`
+> (`test/integrity/moduleResolution.test.js`).

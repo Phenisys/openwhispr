@@ -134,6 +134,8 @@ case "$RESOLVE_RC" in
   2) echo "Conflits de contenu restants : arbitrer fichier par fichier (l'amont gagne," \
           "sauf spécificité Phenisys — cf. docs/upstream-1.9.0/inventory.md de la branche" \
           "de portage, tag port/v1.9.0-reference)." ;;
+  1) echo "ERREUR : chemins interdits encore présents, ou importations pointant vers" \
+          "une cible absente (nettoyage du câblage à faire avant de committer)." >&2 ;;
   *) echo "ERREUR : résolution mécanique incomplète (code $RESOLVE_RC)." >&2 ;;
 esac
 
