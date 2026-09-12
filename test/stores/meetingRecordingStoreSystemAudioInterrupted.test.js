@@ -99,7 +99,24 @@ async function startWithPendingMicrophone(t, startResult) {
     await finishStart();
     await store.stopRecording();
   });
-  await Promise.all([mainStarted.promise, micRequested.promise]);
+  const started = await Promise.race([
+    Promise.all([mainStarted.promise, micRequested.promise]).then(() => true),
+    starting.then(() => false),
+  ]);
+  // Both hand-offs happen before a start that gets as far as the pipeline
+  // resolves, so racing the start's own settlement only changes the outcome when
+  // it aborts earlier: the store resolves its meeting transcription options while
+  // building the main-process start call, and a provider it cannot serve makes
+  // that resolution throw before the microphone is ever requested. Awaiting the
+  // two hand-offs alone then never settles, which hangs the whole `node --test`
+  // run — not just this file — so the abort is surfaced as a failure naming the
+  // store's own error instead.
+  assert.ok(
+    started,
+    "startRecording settled without requesting the microphone or starting the main process (error: " +
+      store.useMeetingRecordingStore.getState().error +
+      ")"
+  );
   return { api, listeners, store, finishStart };
 }
 
