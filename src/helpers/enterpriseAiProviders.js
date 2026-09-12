@@ -8,7 +8,44 @@
 // app startup doesn't eager-load ~100 MB of AWS/Azure/Google SDKs for users
 // who never select an enterprise provider.
 
-const { isAllowedAzureEndpoint } = require("./enterpriseManagedConfig.mjs");
+// Azure endpoints are accepted only on public Azure resource hosts. This is the
+// same allowlist the managed-config envelope validator enforces upstream; it
+// lives here because that module belongs to the workspace-managed layer this
+// build does not compile in, and `toAzureOpenAIBaseUrl` must keep its guard
+// without it.
+const AZURE_HOST_SUFFIXES = [
+  ".openai.azure.com",
+  ".cognitiveservices.azure.com",
+  ".services.ai.azure.com",
+];
+
+function isSafeHttpsUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      (!url.port || url.port === "443")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedAzureEndpoint(value) {
+  if (!isSafeHttpsUrl(value)) return false;
+  const url = new URL(value);
+  const hostname = url.hostname.toLowerCase();
+  return (
+    AZURE_HOST_SUFFIXES.some(
+      (suffix) => hostname.endsWith(suffix) && hostname.length > suffix.length
+    ) &&
+    (url.pathname === "" || url.pathname === "/") &&
+    !url.search &&
+    !url.hash
+  );
+}
 
 async function getEnterpriseAIModel(provider, model, apiKey, enterprise) {
   switch (provider) {
@@ -113,4 +150,4 @@ function createVertexModel(model, apiKey, enterprise) {
   })(model);
 }
 
-module.exports = { getEnterpriseAIModel, toAzureOpenAIBaseUrl };
+module.exports = { getEnterpriseAIModel, toAzureOpenAIBaseUrl, AZURE_HOST_SUFFIXES };

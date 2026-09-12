@@ -139,7 +139,7 @@ test/services/syncPassPolicy.test.js
 test/services/teamRosterCache.test.js
 test/utils/billingSeatIntent.test.js
 
-[excluded]  # 62 fichiers amont exclus (arrivés sans conflit)
+[excluded]  # 58 fichiers amont exclus (arrivés sans conflit)
 src/assets/icons/microsoft-calendar.svg
 src/assets/icons/microsoft-calendar.webp
 src/components/CompactAuthenticationFlow.tsx
@@ -156,7 +156,6 @@ src/helpers/enterpriseManagedConfig.mjs
 src/helpers/managedTranscriptionExecutor.js
 src/helpers/microsoftCalendarManager.js
 src/helpers/microsoftCalendarOAuth.js
-src/helpers/oauthLoopbackFlow.js
 src/hooks/useBillingRefreshOnReturn.ts
 src/hooks/useInsightsSyncOptIn.tsx
 src/hooks/useJoinableWorkspaces.ts
@@ -179,20 +178,17 @@ test/helpers/accountScopeIpc.test.js
 test/helpers/accountScopeRestoreContract.test.js
 test/helpers/bedrockEnterpriseIpc.test.js
 test/helpers/cortiAuth.test.js
-test/helpers/enterpriseAiProviders.test.js
-test/helpers/enterpriseAiProvidersAzureHosts.test.js
-test/helpers/enterpriseEndpointGuard.test.js
 test/helpers/enterpriseIdentityManager.test.js
 test/helpers/enterpriseManagedConfig.test.js
 test/helpers/managedTranscriptionExecutor.test.js
 test/helpers/microsoftCalendarManager.test.js
-test/helpers/oauthLoopbackFlow.test.js
 test/helpers/retiredCloudModels.test.js
 test/hooks/insightsSyncOptIn.test.js
 test/lib/accountDeletionFlow.test.js
 test/lib/accountScopeMirror.test.js
 test/lib/authDeleteAccount.test.js
 test/lib/emailAuthDiscovery.test.js
+test/lib/highestPlan.test.js
 test/lib/workspaceBilling.test.js
 test/services/analyticsPassAccountingContract.test.js
 test/services/enterpriseInferenceErrors.test.js
@@ -203,6 +199,20 @@ test/stores/enterpriseIdentityStoreEnforcement.test.js
 test/stores/enterpriseIdentityStoreImports.test.js
 test/utils/managedAzureTranscriptionUrl.test.js
 
+
+# Restaurations du 2026-09-12 (fusion v1.10.0, nettoyage du câblage) — ces
+# chemins ont été retirés de [excluded] parce que le fork CONSERVE la
+# fonctionnalité qui les utilise :
+#   src/helpers/oauthLoopbackFlow.js            flow PKCE 127.0.0.1 partagé,
+#     requis par src/helpers/googleCalendarOAuth.js (agenda Google conservé) ;
+#     sans lui le require est cassé et le processus principal ne démarre plus.
+#   test/helpers/oauthLoopbackFlow.test.js      test du précédent.
+#   test/helpers/enterpriseAiProviders.test.js  test du module conservé
+#     src/helpers/enterpriseAiProviders.js (fournisseurs Bedrock/Azure/Vertex BYOK).
+#   test/helpers/enterpriseAiProvidersAzureHosts.test.js  même module ; son
+#     import d'allowlist pointe désormais sur enterpriseAiProviders.js.
+#   test/helpers/enterpriseEndpointGuard.test.js  test de
+#     src/helpers/enterpriseProviderErrors.js (module conservé).
 [warn]
 *account*
 *billing*
