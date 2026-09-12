@@ -8,7 +8,6 @@ import { useTheme } from "./hooks/useTheme";
 
 const ControlPanel = React.lazy(() => import("./components/ControlPanel.tsx"));
 const OnboardingFlow = React.lazy(() => import("./components/OnboardingFlow.tsx"));
-const AgentOverlay = React.lazy(() => import("./components/AgentOverlay.tsx"));
 
 export default function AppRouter() {
   useTheme();
@@ -18,12 +17,8 @@ export default function AppRouter() {
     return <MeetingNotificationOverlay />;
   }
 
-  if (params.includes("update-notification=true")) {
-    return <UpdateNotificationOverlay />;
-  }
-
-  if (params.includes("transcription-preview=true")) {
-    return <TranscriptionPreviewOverlay />;
+  if (params.includes("agent-dictation-pill=true")) {
+    return <AgentDictationPillOverlay />;
   }
 
   return <MainApp />;
@@ -34,16 +29,13 @@ function MainApp() {
   const [isLoading, setIsLoading] = useState(true);
   const [postOnboardingSettingsSection, setPostOnboardingSettingsSection] = useState(undefined);
 
-  const isAgentPanel = window.location.search.includes("agent=true");
-  const isControlPanel =
-    !isAgentPanel &&
-    (window.location.pathname.includes("control") || window.location.search.includes("panel=true"));
-  const isDictationPanel = !isControlPanel && !isAgentPanel;
+  const isControlPanel = isControlPanelWindow();
+  const isDictationPanel = !isControlPanel;
+  // Covers every surface this window hosts: onboarding, reauth, the panel.
+  useControlPanelWindowDrag(isControlPanel);
 
   useEffect(() => {
-    if (isAgentPanel) {
-      import("./components/AgentOverlay.tsx").catch(() => {});
-    } else if (isControlPanel) {
+    if (isControlPanel) {
       import("./components/ControlPanel.tsx").catch(() => {});
 
       if (!localStorage.getItem("onboardingCompleted")) {
@@ -54,6 +46,18 @@ function MainApp() {
 
   useEffect(() => {
     const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
+    const authSkipped =
+      localStorage.getItem("authenticationSkipped") === "true" ||
+      localStorage.getItem("skipAuth") === "true";
+    const onboardingInProgress = isOnboardingInProgress();
+    const isReturningUser =
+      !onboardingCompleted && isSignedIn && !isGracePeriodOnly && !onboardingInProgress;
+
+    if (isReturningUser) {
+      localStorage.setItem("onboardingCompleted", "true");
+    }
+
+    const resolved = localStorage.getItem("onboardingCompleted") === "true";
 
     if (isControlPanel) {
       if (!onboardingCompleted) {
@@ -68,6 +72,69 @@ function MainApp() {
     setIsLoading(false);
   }, [isControlPanel, isDictationPanel]);
 
+  useEffect(() => {
+    if (!isControlPanel || !authLoaded) return;
+    // Fast path: a user who already finished onboarding can never enter the
+    // compact flow only when their session or guest choice is still valid.
+    // Signed-out account users fall through so reauthentication can select the
+    // compact window without first flashing restored control-panel dimensions.
+    const completed = localStorage.getItem("onboardingCompleted") === "true";
+    const authSkipped =
+      localStorage.getItem("authenticationSkipped") === "true" ||
+      localStorage.getItem("skipAuth") === "true";
+    if (completed && !isOnboardingInProgress() && (isSignedIn || authSkipped)) {
+      void window.electronAPI?.setOnboardingWindowMode?.("restore");
+    }
+  }, [authLoaded, isControlPanel, isSignedIn]);
+
+  const settledControlPanelWindowMode = resolveSettledControlPanelWindowMode({
+    isControlPanel,
+    isLoading,
+    isWaitingForPolicyStart,
+    showOnboarding,
+    needsReauth,
+  });
+
+  useEffect(() => {
+    if (!settledControlPanelWindowMode) return;
+    // The main process waits for this renderer decision before showing the
+    // control panel, preventing a fresh install from flashing at 1200×800
+    // before its route-appropriate window mode is applied.
+    void window.electronAPI?.setOnboardingWindowMode?.(settledControlPanelWindowMode);
+  }, [settledControlPanelWindowMode]);
+
+  useEffect(() => {
+    if (isLoading || isWaitingForPolicyStart) return;
+
+    const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
+    const normalAppVisible =
+      onboardingCompleted && (!isControlPanel || (!showOnboarding && !needsReauth));
+    const authSkipped =
+      localStorage.getItem("authenticationSkipped") === "true" ||
+      localStorage.getItem("skipAuth") === "true";
+    // Main starts fail-closed. Only a renderer that has resolved the route and
+    // actually committed the normal app may release global hotkeys and popup
+    // surfaces; fresh installs and onboarding reloads keep them suppressed.
+    void window.electronAPI?.setOnboardingActive?.(!normalAppVisible);
+    let cancelled = false;
+    void resolveMacAccessibilityReadiness({
+      normalAppVisible,
+      isControlPanel,
+      isSignedIn,
+      authSkipped,
+      // The hidden dictation window cannot resolve Better Auth itself. Its
+      // persisted main-process scope proves this is a validated returning user.
+      readActiveAccountScope: window.electronAPI?.getActiveAccountScope,
+    }).then((readiness) => {
+      if (!cancelled && readiness) {
+        window.electronAPI?.markMacAccessibilityFeaturesReady?.(readiness.expectedAccountScope);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isControlPanel, isLoading, isSignedIn, isWaitingForPolicyStart, needsReauth, showOnboarding]);
+
   const handleOnboardingComplete = (options) => {
     if (options?.openSettings) {
       setPostOnboardingSettingsSection("transcription");
@@ -76,15 +143,10 @@ function MainApp() {
     localStorage.setItem("onboardingCompleted", "true");
   };
 
-  if (isAgentPanel) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <AgentOverlay />
-      </Suspense>
-    );
-  }
-
-  if (isLoading) {
+  // isLoading clears once the onboarding effect has run, which itself waits
+  // for authLoaded — and authLoaded terminates even when the session cannot
+  // resolve (guest/offline presents as signed out).
+  if (isLoading || isWaitingForPolicyStart) {
     return <LoadingFallback />;
   }
 
@@ -92,6 +154,7 @@ function MainApp() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <OnboardingFlow onComplete={handleOnboardingComplete} />
+        <BackgroundModelDownloadTray placement="onboarding" />
       </Suspense>
     );
   }
@@ -99,6 +162,7 @@ function MainApp() {
   return isControlPanel ? (
     <Suspense fallback={<LoadingFallback />}>
       <ControlPanel initialSettingsSection={postOnboardingSettingsSection} />
+      <BackgroundModelDownloadTray />
     </Suspense>
   ) : (
     <App />

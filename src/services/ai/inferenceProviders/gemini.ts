@@ -2,13 +2,15 @@ import type { InferenceProvider } from "./types";
 import { getCloudModel } from "../../../models/ModelRegistry";
 import { withRetry, createApiRetryStrategy, httpError } from "../../../utils/retry";
 import { API_ENDPOINTS, TOKEN_LIMITS } from "../../../config/constants";
+import { getLlmRequestTimeoutSeconds } from "../../../helpers/llmRequestTimeout.js";
+import { extractGeminiText } from "../../../helpers/geminiResponse.js";
 import { wrapCleanupTranscript } from "../../../config/prompts";
 import { extractApiErrorMessage } from "../apiErrorMessage";
 import logger from "../../../utils/logger";
 
 interface GeminiResponse {
   candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
     finishReason?: string;
   }>;
   usageMetadata?: { totalTokenCount?: number };
@@ -25,6 +27,7 @@ interface GeminiGenerationConfig {
 
 export const geminiProvider: InferenceProvider = {
   id: "gemini",
+  supportsImages: true,
   async call({ text, model, agentName, config, ctx }) {
     logger.logReasoning("GEMINI_START", { model, agentName, hasApiKey: false });
     const apiKey = await ctx.getApiKey("gemini");
@@ -53,14 +56,19 @@ export const geminiProvider: InferenceProvider = {
       generationConfig.thinkingConfig = { thinkingLevel: "minimal", includeThoughts: false };
     }
 
-    const requestBody = {
-      contents: [
-        {
-          parts: systemPrompt
-            ? [{ text: `${systemPrompt}\n\n${userContent}` }]
-            : [{ text: userContent }],
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+      { text: systemPrompt ? `${systemPrompt}\n\n${userContent}` : userContent },
+    ];
+    if (config.screenContext) {
+      parts.push({
+        inlineData: {
+          mimeType: config.screenContext.mediaType,
+          data: config.screenContext.data,
         },
-      ],
+      });
+    }
+    const requestBody = {
+      contents: [{ parts }],
       generationConfig,
     };
 
@@ -69,11 +77,21 @@ export const geminiProvider: InferenceProvider = {
         endpoint: `${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`,
         model,
         hasApiKey: !!apiKey,
-        requestBody: JSON.stringify(requestBody).substring(0, 200),
+        hasScreenContext: !!config.screenContext,
+        // A short prompt could let the 200-char preview reach into the base64
+        // image part — preview the text part only, never the full body.
+        requestBody: JSON.stringify({
+          ...requestBody,
+          contents: [{ parts: [parts[0]] }],
+        }).substring(0, 200),
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs ?? 30000);
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        config.timeoutMs ?? getLlmRequestTimeoutSeconds() * 1000
+      );
+
       try {
         const res = await fetch(`${API_ENDPOINTS.GEMINI}/models/${model}:generateContent`, {
           method: "POST",
@@ -113,7 +131,7 @@ export const geminiProvider: InferenceProvider = {
         return jsonResponse;
       } catch (error) {
         if ((error as Error).name === "AbortError") {
-          throw new Error("Request timed out after 30s");
+          throw new Error(`Request timed out after ${timeoutSeconds}s`);
         }
         throw error;
       } finally {
@@ -125,7 +143,8 @@ export const geminiProvider: InferenceProvider = {
     if (config.requireCompleteOutput && candidate?.finishReason === "MAX_TOKENS") {
       throw new Error("Model output was truncated before the selection edit completed");
     }
-    if (!candidate?.content?.parts?.[0]?.text) {
+    const responseText = extractGeminiText(candidate);
+    if (!responseText) {
       logger.logReasoning("GEMINI_EMPTY_RESPONSE", {
         model,
         finishReason: candidate?.finishReason,
@@ -137,8 +156,6 @@ export const geminiProvider: InferenceProvider = {
       }
       throw new Error("Gemini returned empty response");
     }
-
-    const responseText = candidate.content.parts[0].text!.trim();
     logger.logReasoning("GEMINI_RESPONSE", {
       model,
       responseLength: responseText.length,
