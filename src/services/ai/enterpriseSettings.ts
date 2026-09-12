@@ -1,5 +1,6 @@
 import { getSettings } from "../../stores/settingsStore";
 import type { EnterpriseProvider } from "../../models/ModelRegistry";
+import type { InferenceScope } from "../../config/inferenceScopes";
 
 export type EnterpriseCallSettings = {
   apiKey: string;
@@ -14,7 +15,12 @@ export type EnterpriseCallSettings = {
   vertexLocation: string;
 };
 
-export function getEnterpriseCallSettings(provider: EnterpriseProvider): EnterpriseCallSettings {
+export function getEnterpriseCallSettings(
+  provider: EnterpriseProvider,
+  // Le scope servait a la resolution « managed », retiree avec la couche
+  // compte/entreprise ; le parametre reste accepte pour les appelants amont.
+  _inferenceScope?: InferenceScope
+): EnterpriseCallSettings {
   const s = getSettings();
   return {
     apiKey: provider === "azure" ? s.azureApiKey : provider === "vertex" ? s.vertexApiKey : "",

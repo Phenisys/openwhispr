@@ -1,14 +1,24 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import App from "./App.jsx";
+import AgentDictationPillOverlay from "./components/dictation/AgentDictationPillOverlay.tsx";
 import MeetingNotificationOverlay from "./components/MeetingNotificationOverlay.tsx";
-import TranscriptionPreviewOverlay from "./components/TranscriptionPreviewOverlay.tsx";
-import UpdateNotificationOverlay from "./components/UpdateNotificationOverlay.tsx";
+import BackgroundModelDownloadTray from "./components/onboarding/BackgroundModelDownloadTray.tsx";
+import { LEGACY_ONBOARDING_STEP_KEY, ONBOARDING_SESSION_KEY } from "./components/onboarding/flow";
+import { useControlPanelWindowDrag } from "./hooks/useControlPanelWindowDrag";
 import { useTheme } from "./hooks/useTheme";
+import { resolveSettledControlPanelWindowMode } from "./utils/controlPanelWindowMode.ts";
+import { resolveMacAccessibilityReadiness } from "./utils/macAccessibilityReadiness.ts";
+import { isControlPanelWindow } from "./utils/windowContext.ts";
+
+// Either marker means the flow is mid-way: the legacy step key is kept for
+// back-compat, the v2 session is what the rebuilt flow actually persists.
+const isOnboardingInProgress = () =>
+  localStorage.getItem(LEGACY_ONBOARDING_STEP_KEY) !== null ||
+  localStorage.getItem(ONBOARDING_SESSION_KEY) !== null;
 
 const ControlPanel = React.lazy(() => import("./components/ControlPanel.tsx"));
 const OnboardingFlow = React.lazy(() => import("./components/OnboardingFlow.tsx"));
-const AgentOverlay = React.lazy(() => import("./components/AgentOverlay.tsx"));
 
 export default function AppRouter() {
   useTheme();
@@ -18,39 +28,41 @@ export default function AppRouter() {
     return <MeetingNotificationOverlay />;
   }
 
-  if (params.includes("update-notification=true")) {
-    return <UpdateNotificationOverlay />;
-  }
-
-  if (params.includes("transcription-preview=true")) {
-    return <TranscriptionPreviewOverlay />;
+  if (params.includes("agent-dictation-pill=true")) {
+    return <AgentDictationPillOverlay />;
   }
 
   return <MainApp />;
 }
 
 function MainApp() {
+  // Le fork n'a pas de compte : il n'y a ni session a charger, ni periode de
+  // grace, ni reauthentification a demander. Les deux constantes gardent les
+  // decisions de fenetre lisibles telles quelles.
+  const isSignedIn = false;
+  const authLoaded = true;
+  // Sans compte, aucune politique d'organisation distante n'est attendue.
+  const isWaitingForPolicyStart = false;
+  const needsReauth = false;
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [postOnboardingSettingsSection, setPostOnboardingSettingsSection] = useState(undefined);
 
-  const isAgentPanel = window.location.search.includes("agent=true");
-  const isControlPanel =
-    !isAgentPanel &&
-    (window.location.pathname.includes("control") || window.location.search.includes("panel=true"));
-  const isDictationPanel = !isControlPanel && !isAgentPanel;
+  const isControlPanel = isControlPanelWindow();
+  const isDictationPanel = !isControlPanel;
+  // Covers every surface this window hosts: onboarding, reauth, the panel.
+  useControlPanelWindowDrag(isControlPanel);
 
   useEffect(() => {
-    if (isAgentPanel) {
-      import("./components/AgentOverlay.tsx").catch(() => {});
-    } else if (isControlPanel) {
+    if (isControlPanel) {
       import("./components/ControlPanel.tsx").catch(() => {});
 
       if (!localStorage.getItem("onboardingCompleted")) {
         import("./components/OnboardingFlow.tsx").catch(() => {});
       }
     }
-  }, [isAgentPanel, isControlPanel]);
+  }, [isControlPanel]);
 
   useEffect(() => {
     const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
@@ -68,6 +80,64 @@ function MainApp() {
     setIsLoading(false);
   }, [isControlPanel, isDictationPanel]);
 
+  useEffect(() => {
+    if (!isControlPanel || !authLoaded) return;
+    // Fast path: a user who already finished onboarding can never enter the
+    // compact flow only when their session or guest choice is still valid.
+    const completed = localStorage.getItem("onboardingCompleted") === "true";
+    const authSkipped =
+      localStorage.getItem("authenticationSkipped") === "true" ||
+      localStorage.getItem("skipAuth") === "true";
+    if (completed && !isOnboardingInProgress() && (isSignedIn || authSkipped)) {
+      void window.electronAPI?.setOnboardingWindowMode?.("restore");
+    }
+  }, [authLoaded, isControlPanel, isSignedIn]);
+
+  const settledControlPanelWindowMode = resolveSettledControlPanelWindowMode({
+    isControlPanel,
+    isLoading,
+    isWaitingForPolicyStart,
+    showOnboarding,
+    needsReauth,
+  });
+
+  useEffect(() => {
+    if (!settledControlPanelWindowMode) return;
+    // The main process waits for this renderer decision before showing the
+    // control panel, preventing a fresh install from flashing at 1200×800
+    // before its route-appropriate window mode is applied.
+    void window.electronAPI?.setOnboardingWindowMode?.(settledControlPanelWindowMode);
+  }, [settledControlPanelWindowMode]);
+
+  useEffect(() => {
+    if (isLoading || isWaitingForPolicyStart) return;
+
+    const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
+    const normalAppVisible =
+      onboardingCompleted && (!isControlPanel || (!showOnboarding && !needsReauth));
+    const authSkipped =
+      localStorage.getItem("authenticationSkipped") === "true" ||
+      localStorage.getItem("skipAuth") === "true";
+    // Main starts fail-closed. Only a renderer that has resolved the route and
+    // actually committed the normal app may release global hotkeys and popup
+    // surfaces; fresh installs and onboarding reloads keep them suppressed.
+    void window.electronAPI?.setOnboardingActive?.(!normalAppVisible);
+    let cancelled = false;
+    void resolveMacAccessibilityReadiness({
+      normalAppVisible,
+      isControlPanel,
+      isSignedIn,
+      authSkipped,
+    }).then((readiness) => {
+      if (!cancelled && readiness) {
+        window.electronAPI?.markMacAccessibilityFeaturesReady?.(readiness.expectedAccountScope);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isControlPanel, isLoading, isSignedIn, isWaitingForPolicyStart, needsReauth, showOnboarding]);
+
   const handleOnboardingComplete = (options) => {
     if (options?.openSettings) {
       setPostOnboardingSettingsSection("transcription");
@@ -76,15 +146,8 @@ function MainApp() {
     localStorage.setItem("onboardingCompleted", "true");
   };
 
-  if (isAgentPanel) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <AgentOverlay />
-      </Suspense>
-    );
-  }
-
-  if (isLoading) {
+  // isLoading clears once the onboarding effect has run.
+  if (isLoading || isWaitingForPolicyStart) {
     return <LoadingFallback />;
   }
 
@@ -92,6 +155,7 @@ function MainApp() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <OnboardingFlow onComplete={handleOnboardingComplete} />
+        <BackgroundModelDownloadTray placement="onboarding" />
       </Suspense>
     );
   }
@@ -99,6 +163,7 @@ function MainApp() {
   return isControlPanel ? (
     <Suspense fallback={<LoadingFallback />}>
       <ControlPanel initialSettingsSection={postOnboardingSettingsSection} />
+      <BackgroundModelDownloadTray />
     </Suspense>
   ) : (
     <App />

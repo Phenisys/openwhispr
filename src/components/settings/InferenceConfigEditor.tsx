@@ -1,27 +1,38 @@
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
-import { Key, Cpu, Network, Building2, Settings2 } from "lucide-react";
+import { Key, Cpu, Network, Building2, ShieldCheck, AlertTriangle, Settings2 } from "../icons";
+
 import {
+  LLM_ENTERPRISE_POLICY_PROVIDER_IDS,
+  LLM_POLICY_PROVIDER_IDS,
   useSettingsStore,
+  selectPolicyEffectiveSettings,
   selectResolvedLLMConfig,
   setResolvedLLMConfig,
 } from "../../stores/settingsStore";
-import { usePolicyModeOptions } from "../../hooks/usePolicy";
+import { usePolicyModeOptions, usePolicySnapshot } from "../../hooks/usePolicy";
 import { InferenceModeSelector } from "../ui/SettingsSection";
 import type { InferenceModeOption } from "../ui/SettingsSection";
 import ReasoningModelSelector from "../ReasoningModelSelector";
-import EnterpriseSection from "../EnterpriseSection";
 import OpenAICompatiblePanel from "../OpenAICompatiblePanel";
 import { Toggle } from "../ui/toggle";
 import type { InferenceMode } from "../../types/electron";
 import type { InferenceScope } from "../../config/inferenceScopes";
-import { isProviderValidForMode, getCloudModel, getLocalModel } from "../../models/ModelRegistry";
+import {
+  isProviderValidForMode,
+  getCloudModel,
+  getLocalModel,
+  enterpriseProviderName,
+} from "../../models/ModelRegistry";
+import TestConnectionButton from "../TestConnectionButton";
+import { Button } from "../ui/button";
 
 const MODE_LABEL_PREFIX: Record<InferenceScope, string> = {
   dictationCleanup: "settingsPage.aiModels.modes",
   noteFormatting: "settingsPage.aiModels.modes",
   dictationAgent: "dictationAgent.modes",
+  dictationAgentVision: "dictationAgent.modes",
   chatIntelligence: "agentMode.settings.modes",
   dictationTranslation: "settingsPage.aiModels.modes",
 };
@@ -29,43 +40,61 @@ const MODE_LABEL_PREFIX: Record<InferenceScope, string> = {
 interface InferenceConfigEditorProps {
   scope: InferenceScope;
   onModeChange?: (mode: InferenceMode) => void;
+  /** Restrict the selectable modes (e.g. vision override offers cloud/BYOK only). */
+  allowedModes?: InferenceMode[];
 }
 
-export default function InferenceConfigEditor({ scope, onModeChange }: InferenceConfigEditorProps) {
+export default function InferenceConfigEditor({
+  scope,
+  onModeChange,
+  allowedModes,
+}: InferenceConfigEditorProps) {
   const { t } = useTranslation();
-  const config = useSettingsStore(useShallow((s) => selectResolvedLLMConfig(s, scope)));
+  const policyState = usePolicySnapshot();
+  const config = useSettingsStore(
+    useShallow((settings) =>
+      selectResolvedLLMConfig(selectPolicyEffectiveSettings(settings, policyState), scope)
+    )
+  );
   const localInferenceTimeoutMs = useSettingsStore((s) => s.localInferenceTimeoutMs);
   const setLocalInferenceTimeoutMs = useSettingsStore((s) => s.setLocalInferenceTimeoutMs);
 
   const prefix = MODE_LABEL_PREFIX[scope];
-  const { modes, isModeAllowed } = usePolicyModeOptions<InferenceModeOption>(
-    [
-      {
-        id: "providers",
-        label: t(`${prefix}.providers`),
-        description: t(`${prefix}.providersDesc`),
-        icon: <Key className="w-4 h-4" />,
-      },
-      {
-        id: "local",
-        label: t(`${prefix}.local`),
-        description: t(`${prefix}.localDesc`),
-        icon: <Cpu className="w-4 h-4" />,
-      },
-      {
-        id: "self-hosted",
-        label: t(`${prefix}.selfHosted`),
-        description: t(`${prefix}.selfHostedDesc`),
-        icon: <Network className="w-4 h-4" />,
-      },
-      {
-        id: "enterprise",
-        label: t(`${prefix}.enterprise`),
-        description: t(`${prefix}.enterpriseDesc`),
-        icon: <Building2 className="w-4 h-4" />,
-      },
-    ],
-    "llm"
+  const { modes, effectiveMode, isModeAllowed } = usePolicyModeOptions<InferenceModeOption>(
+    (
+      [
+        {
+          id: "providers",
+          label: t(`${prefix}.providers`),
+          description: t(`${prefix}.providersDesc`),
+          icon: <Key className="w-4 h-4" />,
+        },
+        {
+          id: "local",
+          label: t(`${prefix}.local`),
+          description: t(`${prefix}.localDesc`),
+          icon: <Cpu className="w-4 h-4" />,
+        },
+        {
+          id: "self-hosted",
+          label: t(`${prefix}.selfHosted`),
+          description: t(`${prefix}.selfHostedDesc`),
+          icon: <Network className="w-4 h-4" />,
+        },
+        {
+          id: "enterprise",
+          label: t(`${prefix}.enterprise`),
+          description: t(`${prefix}.enterpriseDesc`),
+          icon: <Building2 className="w-4 h-4" />,
+        },
+      ] as InferenceModeOption[]
+    ).filter((mode) => !allowedModes || allowedModes.includes(mode.id)),
+    "llm",
+    config.mode,
+    {
+      byokProviders: LLM_POLICY_PROVIDER_IDS,
+      enterpriseProviders: LLM_ENTERPRISE_POLICY_PROVIDER_IDS,
+    }
   );
 
   const setField = useCallback(
@@ -79,7 +108,7 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
   const handleModeSelect = useCallback(
     (mode: InferenceMode) => {
       if (!isModeAllowed(mode)) return;
-      if (mode === config.mode) return;
+      if (mode === effectiveMode) return;
 
       const patch: Parameters<typeof setResolvedLLMConfig>[1] = {
         mode,
@@ -96,7 +125,7 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
 
       onModeChange?.(mode);
     },
-    [scope, config.mode, config.provider, onModeChange, isModeAllowed]
+    [scope, config.provider, effectiveMode, onModeChange, isModeAllowed]
   );
 
   const setMode = setField("mode");
@@ -119,21 +148,27 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
   );
 
   const showThinkingToggle =
-    config.mode === "self-hosted" ||
-    (config.mode === "providers" &&
+    effectiveMode === "self-hosted" ||
+    (effectiveMode === "providers" &&
       (config.provider === "custom" ||
         config.provider === "openrouter" ||
         !!getCloudModel(config.model)?.supportsThinking)) ||
-    (config.mode === "local" && !!getLocalModel(config.model)?.supportsThinking);
+    (effectiveMode === "local" && !!getLocalModel(config.model)?.supportsThinking);
 
   return (
     <div className="space-y-3">
-      <InferenceModeSelector modes={modes} activeMode={config.mode} onSelect={handleModeSelect} />
+      {modes.length > 1 && (
+        <InferenceModeSelector
+          modes={modes}
+          activeMode={effectiveMode}
+          onSelect={handleModeSelect}
+        />
+      )}
 
-      {config.mode === "providers" && renderModelSelector("cloud")}
-      {config.mode === "local" && renderModelSelector("local")}
+      {effectiveMode === "providers" && renderModelSelector("cloud")}
+      {effectiveMode === "local" && renderModelSelector("local")}
 
-      {config.mode === "self-hosted" && (
+      {effectiveMode === "self-hosted" && (
         <OpenAICompatiblePanel
           baseUrl={config.remoteUrl ?? ""}
           setBaseUrl={setField("remoteUrl")}
@@ -160,15 +195,6 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
           </div>
           <Toggle checked={config.disableThinking} onChange={setField("disableThinking")} />
         </div>
-      )}
-
-      {config.mode === "enterprise" && (
-        <EnterpriseSection
-          currentProvider={config.provider}
-          reasoningModel={config.model}
-          setReasoningModel={setModel}
-          setLocalReasoningProvider={setProvider}
-        />
       )}
 
       {/* Advanced: request timeouts */}

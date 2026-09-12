@@ -14,13 +14,11 @@ interface ConversationItem {
 interface ChatState {
   conversations: ConversationItem[];
   activeConversationId: number | null;
-  migration: { total: number; done: number } | null;
 }
 
 const useChatStore = create<ChatState>()(() => ({
   conversations: [],
   activeConversationId: null,
-  migration: null,
 }));
 
 export async function initializeConversations(limit = 50): Promise<ConversationItem[]> {
