@@ -44,15 +44,30 @@ test("every inference scope maps its timeoutMs store key", () => {
 
 test("request timeouts honor the resolved config at every abort point", () => {
   const reasoning = read("services/ReasoningService.ts");
-  assert.match(reasoning, /config\.timeoutMs \?\? 30000/, "processText uses scope timeout");
-  assert.match(reasoning, /config\.timeoutMs \?\? 60000/, "agent stream uses scope timeout");
+  // La fusion a remplacé les littéraux `?? 30000` / `?? 60000` par le délai
+  // global configurable (`getLlmRequestTimeoutSeconds`) : le réglage par portée
+  // (`config.timeoutMs`) reste prioritaire aux deux points d'abandon, et le
+  // repli doit garder les mêmes valeurs par défaut qu'avant la fusion.
+  const scopedAnchors = reasoning.match(/config\.timeoutMs \?\? timeoutSeconds \* 1000/g) ?? [];
+  assert.equal(
+    scopedAnchors.length,
+    2,
+    "le délai par portée est honoré à la requête et au flux d'agent"
+  );
+  const timeoutHelper = read("helpers/llmRequestTimeout.js");
+  assert.match(timeoutHelper, /LLM_REQUEST_TIMEOUT_SECONDS = 30/, "repli de requête à 30 s");
+  assert.match(timeoutHelper, /LLM_STREAMING_TIMEOUT_SECONDS = 60/, "repli de flux à 60 s");
 
   const openai = read("services/ai/inferenceProviders/openai.ts");
-  assert.match(openai, /config\.timeoutMs \?\? REQUEST_TIMEOUT_MS/, "openai provider");
+  assert.match(
+    openai,
+    /config\.timeoutMs \?\? getLlmRequestTimeoutSeconds\(\) \* 1000/,
+    "openai provider"
+  );
   const gemini = read("services/ai/inferenceProviders/gemini.ts");
-  assert.match(gemini, /config\.timeoutMs \?\? 30000/, "gemini provider");
+  assert.match(gemini, /config\.timeoutMs \?\? timeoutSeconds \* 1000/, "gemini provider");
   const tinfoil = read("services/ai/inferenceProviders/tinfoil.ts");
-  assert.match(tinfoil, /config\.timeoutMs \?\? REQUEST_TIMEOUT_MS/, "tinfoil provider");
+  assert.match(tinfoil, /config\.timeoutMs \?\? timeoutMs/, "tinfoil provider");
 });
 
 test("local llama timeout is configurable end to end", () => {
