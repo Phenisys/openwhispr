@@ -4,11 +4,42 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="./assets/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="./assets/fonts/noto-sans.css">
+    <link rel="stylesheet" href="./assets/fonts/noto-sans.css" />
     <title>OpenWhispr</title>
+    <script>
+      // Anti-flash theme bootstrap: apply the saved theme before the first
+      // paint so windows never flash light when the user chose dark/system.
+      // Kept inline and framework-free on purpose — it must run before the
+      // CSSOM paints and before any module loads. Mirrors src/utils/theme.ts.
+      (function () {
+        try {
+          var stored = null;
+          try {
+            stored = window.localStorage.getItem("theme");
+          } catch (e) {
+            /* localStorage unavailable — fall back to system */
+          }
+          var dark = false;
+          if (stored === "light") {
+            dark = false;
+          } else if (stored === "dark") {
+            dark = true;
+          } else {
+            dark =
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches;
+          }
+          if (dark) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {
+          /* never block rendering on theme bootstrap */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/main.jsx"></script>
   </body>
-</html> 
+</html>
