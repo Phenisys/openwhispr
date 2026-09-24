@@ -139,7 +139,7 @@ jobs:
         run: npm run build:linux -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
-          BRAND_FONTS_REQUIRED: "1"
+          BRAND_FONTS_REQUIRED: "0"
           VITE_AUTH_URL: ${{ vars.VITE_AUTH_URL || 'https://auth.openwhispr.com' }}
           VITE_OPENWHISPR_API_URL: ${{ vars.VITE_OPENWHISPR_API_URL }}
           VITE_OPENWHISPR_OAUTH_CALLBACK_URL: ${{ vars.VITE_OPENWHISPR_OAUTH_CALLBACK_URL }}
@@ -386,7 +386,7 @@ jobs:
         env:
           TARGET_ARCH: ${{ matrix.arch }}
           GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
-          BRAND_FONTS_REQUIRED: "1"
+          BRAND_FONTS_REQUIRED: "0"
           VITE_AUTH_URL: ${{ vars.VITE_AUTH_URL || 'https://auth.openwhispr.com' }}
           VITE_OPENWHISPR_API_URL: ${{ vars.VITE_OPENWHISPR_API_URL }}
           VITE_OPENWHISPR_OAUTH_CALLBACK_URL: ${{ vars.VITE_OPENWHISPR_OAUTH_CALLBACK_URL }}
