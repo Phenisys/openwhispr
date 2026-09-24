@@ -32,32 +32,32 @@ export function buildSelectionEditUserPrompt(spokenInstruction, selectedText) {
   });
 }
 
-export function getSelectionCaptureDisposition(capture, accessibilitySkipped = false) {
+const STANDALONE_CAPTURE_CODES = new Set([
+  "target_unavailable",
+  "copy_helper_unavailable",
+  "selection_manager_unavailable",
+  "unsupported_platform",
+  // macOS: neither the accessibility tree nor a synthetic copy could inspect the
+  // app, so a selection is neither readable nor ruled out.
+  "accessibility_unavailable",
+]);
+
+export function getSelectionCaptureDisposition(capture) {
+  if (capture?.status === "editable") return "caret";
   if (!capture || capture.status === "none") return "standalone";
   if (capture.status === "selected") return "selection";
-  if (capture.status === "unavailable") {
-    const structuralUnavailable = new Set([
-      "target_unavailable",
-      "copy_helper_unavailable",
-      "selection_manager_unavailable",
-      "unsupported_platform",
-    ]);
-    if (
-      structuralUnavailable.has(capture.code) ||
-      (capture.code === "accessibility_unavailable" && accessibilitySkipped)
-    ) {
-      return "standalone";
-    }
+  if (capture.status === "unavailable" && STANDALONE_CAPTURE_CODES.has(capture.code)) {
+    return "standalone";
   }
   return capture.status === "target_changed" ? "changed" : "unavailable";
 }
 
 export function extractSelectionEditReplacement(result, completionMarker) {
-  if (typeof result !== "string" || !completionMarker || !result.endsWith(completionMarker)) {
+  if (typeof result !== "string" || (completionMarker && !result.endsWith(completionMarker))) {
     throw new Error("Model output was incomplete before the selection edit completed");
   }
 
-  const replacement = result.slice(0, -completionMarker.length);
+  const replacement = completionMarker ? result.slice(0, -completionMarker.length) : result;
   if (replacement.trim().length === 0) {
     throw new Error("Model returned an empty selection edit");
   }

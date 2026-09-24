@@ -6,7 +6,7 @@ import ApiKeyInput from "./ui/ApiKeyInput";
 import ModelCardList from "./ui/ModelCardList";
 import SearchableModelList, { MODEL_SEARCH_THRESHOLD } from "./ui/SearchableModelList";
 import { buildApiUrl, getModelListBaseCandidates, normalizeBaseUrl } from "../config/constants";
-import { isSecureEndpoint } from "../utils/urlUtils";
+import { isSecureHttpEndpoint } from "../utils/urlUtils";
 import { GetApiKeyLink } from "./ui/GetApiKeyLink";
 
 interface ModelOption {
@@ -122,7 +122,7 @@ export default function OpenAICompatiblePanel({
           return;
         }
 
-        if (!isSecureEndpoint(normalized)) {
+        if (!isSecureHttpEndpoint(normalized)) {
           if (isMountedRef.current && latestBaseRef.current === normalized) {
             setModelsError(t("reasoning.custom.httpsRequired"));
             setModelsLoading(false);
@@ -287,6 +287,7 @@ export default function OpenAICompatiblePanel({
         <div className="space-y-2">
           <h4 className="font-medium text-foreground">{t("reasoning.custom.endpointTitle")}</h4>
           <Input
+            dir="ltr"
             value={draftBase}
             onChange={(event) => setDraftBase(event.target.value)}
             onBlur={handleBlur}
@@ -296,8 +297,14 @@ export default function OpenAICompatiblePanel({
           {helpExamples ?? (
             <p className="text-xs text-muted-foreground">
               {t("reasoning.custom.endpointExamples")}{" "}
-              <code className="text-primary">https://openrouter.ai/api/v1</code> (OpenRouter),{" "}
-              <code className="text-primary">https://api.together.xyz/v1</code> (Together).
+              <code dir="ltr" className="text-primary">
+                https://openrouter.ai/api/v1
+              </code>{" "}
+              (OpenRouter),{" "}
+              <code dir="ltr" className="text-primary">
+                https://api.together.xyz/v1
+              </code>{" "}
+              (Together).
             </p>
           )}
         </div>
@@ -353,7 +360,10 @@ export default function OpenAICompatiblePanel({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {t("reasoning.custom.queryPrefix")} <code className="break-all">{queryUrl}</code>{" "}
+          {t("reasoning.custom.queryPrefix")}{" "}
+          <code dir="ltr" className="break-all">
+            {queryUrl}
+          </code>{" "}
           {t("reasoning.custom.querySuffix")}
         </p>
         {isDraftDirty && (

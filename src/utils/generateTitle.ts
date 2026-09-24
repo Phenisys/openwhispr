@@ -1,6 +1,7 @@
 import reasoningService from "../services/ReasoningService";
 import type { ReasoningConfig } from "../services/BaseReasoningService";
 import { getSettings } from "../stores/settingsStore";
+import { sanitizeGeneratedTitle } from "./sanitizeGeneratedTitle";
 import { resolvePrompt } from "../config/prompts";
 
 export async function generateNoteTitle(
@@ -11,6 +12,8 @@ export async function generateNoteTitle(
   try {
     const raw = await reasoningService.processText(text.slice(0, 2000), modelId, null, {
       systemPrompt: resolvePrompt("titleGeneration", { agentName: null }),
+      inferenceScope: "noteFormatting",
+
       temperature: 0.3,
       disableThinking: getSettings().noteFormattingDisableThinking,
       timeoutMs: getSettings().noteFormattingTimeoutMs,
@@ -18,8 +21,7 @@ export async function generateNoteTitle(
       maxRetries: getSettings().noteFormattingMaxRetries,
       ...config,
     });
-    const cleaned = raw.trim().replace(/^["']|["']$/g, "");
-    return cleaned.length > 0 && cleaned.length < 100 ? cleaned : "";
+    return sanitizeGeneratedTitle(raw);
   } catch {
     return "";
   }
