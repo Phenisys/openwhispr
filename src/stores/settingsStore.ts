@@ -728,10 +728,11 @@ seedDictationAgentScopeFromChat();
 //
 // The two modes fail differently when absent, so they are healed differently.
 // `meetingTranscriptionMode` has no fallback: selectResolvedMeetingTranscription
-// passes it straight through and the store default sends note recordings to
-// OpenWhispr Cloud, so every mode is reconstructed from the snapshot the copy
-// did write — with the same functions migrateProviderSettings() uses, not from
-// today's dictation keys, which the user may have changed since.
+// passes it straight through, so leaving it absent would drop a Note Recording
+// profile that had chosen BYOK onto the local default. Every mode is therefore
+// reconstructed from the snapshot the copy did write — with the same functions
+// migrateProviderSettings() uses, not from today's dictation keys, which the
+// user may have changed since.
 // `noteFormattingMode` does have one: an absent mode reads "openwhispr", but
 // selectIsCloudNoteFormattingMode also requires cloudMode "openwhispr", and the
 // copied cloudMode is "byok", so buildNoteFormattingOverrides emits no provider
@@ -1665,10 +1666,18 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   cleanupRemoteUrl: readString("cleanupRemoteUrl", ""),
 
   meetingTranscriptionMode: (() => {
-    const v = readString("meetingTranscriptionMode", "providers");
+    // Local by default: the managed cloud that used to serve Note Recording was
+    // removed with the account/cloud purge, and a fresh profile has no BYOK
+    // provider to fall back on, so "providers" would fail every start with
+    // `noProviderSelected`. An explicit "providers" choice is kept.
+    const v = readString("meetingTranscriptionMode", "local");
     if (v === "providers" || v === "local" || v === "self-hosted") return v;
-    // Legacy "openwhispr" (cloud) values fall back to BYOK after the cloud purge.
-    return "providers" as InferenceMode;
+    // Legacy "openwhispr" (managed cloud) has no service left here and the mode
+    // is no longer offered by the picker, so it heals local-ward — the same
+    // direction the policy layer resolves an unserviceable Note Recording mode
+    // to. It maps to "local" rather than to BYOK, which would ask for a provider
+    // nobody ever selected.
+    return "local" as InferenceMode;
   })(),
   meetingUseLocalWhisper: readBoolean("meetingUseLocalWhisper", false),
   meetingWhisperModel: readString("meetingWhisperModel", ""),
@@ -2693,9 +2702,12 @@ export interface ResolvedMeetingTranscription {
 export const selectResolvedMeetingTranscription = (
   state: SettingsState
 ): ResolvedMeetingTranscription => {
-  // Cloud streaming transcription was removed with the account/cloud purge;
-  // meeting transcription is local-only now.
-  const cloudTranscriptionProvider = "";
+  // The hosted streaming provider went away with the account/cloud purge, so
+  // there is no catalog left to default from. Note Recording routes to the one
+  // provider the user picked for meeting audio — never to the dictation
+  // provider, which is a different choice the user may never have made here.
+  // Unset reads as "", and the router turns that into `noProviderSelected`.
+  const cloudTranscriptionProvider = state.meetingCloudTranscriptionProvider;
 
   return {
     useLocalWhisper: state.meetingUseLocalWhisper,
