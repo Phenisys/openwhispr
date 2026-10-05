@@ -301,7 +301,6 @@ const LinuxPortalAudioManager = require("./src/helpers/linuxPortalAudioManager")
 const WindowsLoopbackAudioManager = require("./src/helpers/windowsLoopbackAudioManager");
 const MeetingAecManager = require("./src/helpers/meetingAecManager");
 const MeetingDetectionEngine = require("./src/helpers/meetingDetectionEngine");
-const { applyOpenWhisprOriginHeader } = require("./src/helpers/sessionHeaders");
 const { i18nMain, changeLanguage } = require("./src/helpers/i18nMain");
 const { ensureYdotool } = require("./src/helpers/ensureYdotool");
 const sidecarRegistry = require("./src/helpers/sidecarRegistry");
@@ -753,12 +752,9 @@ function resolveAuthUrl() {
   try {
     if (fs.existsSync(envPath)) runtimeEnv = JSON.parse(fs.readFileSync(envPath, "utf8"));
   } catch {}
-  return (
-    process.env.AUTH_URL ||
-    process.env.VITE_AUTH_URL ||
-    runtimeEnv.VITE_AUTH_URL ||
-    "https://auth.openwhispr.com"
-  );
+  // Couche compte purgée dans ce fork : plus d'hôte d'auth amont en repli.
+  // Les appelants gèrent la valeur vide (gardes ci-dessous).
+  return process.env.AUTH_URL || process.env.VITE_AUTH_URL || runtimeEnv.VITE_AUTH_URL || "";
 }
 
 function getOauthCookieName() {
@@ -770,8 +766,10 @@ function getOauthCookieName() {
 // Older website builds send the signed cookie value as `?token=`; trade it
 // for the raw session.token the bearer plugin expects.
 async function exchangeSignedTokenForRawBearer(signedToken) {
+  const authUrl = resolveAuthUrl();
+  if (!authUrl) return null; // aucun hôte d'auth configuré (couche compte purgée)
   try {
-    const res = await net.fetch(`${resolveAuthUrl()}/api/auth/get-session`, {
+    const res = await net.fetch(`${authUrl}/api/auth/get-session`, {
       headers: { Cookie: `${getOauthCookieName()}=${signedToken}` },
       signal: AbortSignal.timeout(5000),
       useSessionCookies: false,
@@ -799,6 +797,7 @@ async function migrateCookieToBearerToken() {
 
   const cookieName = getOauthCookieName();
   const authUrl = resolveAuthUrl();
+  if (!authUrl) return; // aucun hôte d'auth configuré (couche compte purgée)
 
   try {
     const cookies = await session.defaultSession.cookies.get({ url: authUrl, name: cookieName });
@@ -988,8 +987,6 @@ async function startApp() {
   });
 
   await migrateCookieToBearerToken();
-
-  applyOpenWhisprOriginHeader(session.defaultSession);
 
   await windowManager.setActivationModeCache(environmentManager.getActivationMode());
   windowManager.setFloatingIconAutoHide(environmentManager.getFloatingIconAutoHide());

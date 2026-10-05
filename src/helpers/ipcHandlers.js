@@ -188,7 +188,6 @@ const CLOUD_CHUNK_SEGMENT_SECONDS = 240;
 const { createAbortError } = require("./abortError");
 const { testProviderConnection } = require("./providerConnectionTest");
 const { createUploadCancelRegistry } = require("./uploadCancelRegistry");
-const { applyOpenWhisprOriginHeader } = require("./sessionHeaders");
 const {
   CLOUD_UPLOAD_TIMEOUT_MS,
   CLOUD_CHUNK_MAX_ATTEMPTS,
@@ -221,7 +220,6 @@ const cloudUploadSessions = new Map();
 function getCloudUploadSession(partition) {
   if (!cloudUploadSessions.has(partition)) {
     const uploadSession = session.fromPartition(partition);
-    applyOpenWhisprOriginHeader(uploadSession);
     cloudUploadSessions.set(partition, uploadSession);
   }
   return cloudUploadSessions.get(partition);
@@ -5863,7 +5861,7 @@ class IPCHandlers {
       process.env.AUTH_URL ||
       process.env.VITE_AUTH_URL ||
       runtimeEnv.VITE_AUTH_URL ||
-      "https://auth.openwhispr.com";
+      "";
 
     const getSessionCookiesFromWindow = async (win) => {
       const scopedUrls = [getAuthUrl(), getApiUrl()].filter(Boolean);

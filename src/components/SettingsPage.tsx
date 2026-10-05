@@ -1122,9 +1122,6 @@ export default function SettingsPage({
     setPanelStartPosition,
     cloudBackupEnabled,
     setCloudBackupEnabled,
-    insightsSyncEnabled,
-    telemetryEnabled,
-    setTelemetryEnabled,
     audioRetentionDays,
     setAudioRetentionDays,
     transcriptRetentionDays,
@@ -2865,25 +2862,6 @@ EOF`,
       case "privacyData":
         return (
           <div className="space-y-6">
-            {/* Privacy */}
-            <div>
-              <SectionHeader
-                title={t("settingsPage.privacy.title")}
-                description={t("settingsPage.privacy.description")}
-              />
-
-              <SettingsPanel>
-                <SettingsPanelRow>
-                  <SettingsRow
-                    label={t("settingsPage.privacy.usageAnalytics")}
-                    description={t("settingsPage.privacy.usageAnalyticsDescription")}
-                  >
-                    <Toggle checked={telemetryEnabled} onChange={setTelemetryEnabled} />
-                  </SettingsRow>
-                </SettingsPanelRow>
-              </SettingsPanel>
-            </div>
-
             {/* Audio Retention */}
             <div className="border-t border-border/70 pt-6">
               <SectionHeader
