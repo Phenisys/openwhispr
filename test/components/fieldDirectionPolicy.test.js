@@ -64,7 +64,6 @@ const EXPECTED_SHARED_FIELD_DIRECTIONS = {
   "src/components/SnippetsView.tsx": ["auto", "auto", "auto", "auto"],
   "src/components/TranscriptionModelPicker.tsx": ["ltr", "ltr", "ltr"],
   "src/components/notes/ActionManagerDialog.tsx": ["auto", "auto"],
-  "src/components/notes/EmojiPickerInput.tsx": ["inherit"],
   "src/components/notes/UploadAudioView.tsx": ["auto"],
   "src/components/onboarding/ProviderSetupStep.tsx": ["ltr", "ltr", "ltr", "ltr", "ltr", "ltr"],
   "src/components/settings/DictationAgentSettings.tsx": ["auto"],
@@ -85,12 +84,13 @@ const EXPECTED_NATIVE_FIELD_DIRECTIONS = {
   "src/components/notes/NoteEditor.tsx": ["auto", "auto"],
   "src/components/notes/NoteParticipants.tsx": ["auto"],
   "src/components/notes/NotesOnboarding.tsx": ["auto", "auto", "auto"],
-  "src/components/notes/UploadAudioView.tsx": ["ltr", "ltr", "inherit", "inherit"],
+  "src/components/notes/UploadAudioView.tsx": ["ltr", "ltr", "inherit"],
   "src/components/onboarding/DemoStep.tsx": ["auto"],
   "src/components/onboarding/LanguageSelectionStep.tsx": ["auto"],
   "src/components/onboarding/UseCaseStep.tsx": ["auto"],
   "src/components/settings/ChatAgentSettings.tsx": ["auto"],
   "src/components/settings/InferenceConfigEditor.tsx": ["inherit", "inherit", "inherit", "inherit"],
+  "src/components/ui/EmojiPicker.tsx": ["auto"],
   "src/components/ui/LanguageSelector.tsx": ["auto"],
 };
 

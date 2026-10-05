@@ -7,6 +7,7 @@ import {
 import { getSettings } from "../../../stores/settingsStore";
 import { getEnterpriseCallSettings } from "../enterpriseSettings";
 import { wrapCleanupTranscript } from "../../../config/prompts";
+import { getLlmRequestTimeoutSeconds } from "../../../helpers/llmRequestTimeout.js";
 import logger from "../../../utils/logger";
 
 export const enterpriseProvider: InferenceProvider = {
@@ -40,6 +41,7 @@ export const enterpriseProvider: InferenceProvider = {
         systemPrompt: systemPrompt || undefined,
         provider: enterpriseId,
         supportsTemperature,
+        timeoutMs: getLlmRequestTimeoutSeconds({ scope: config.inferenceScope }) * 1000,
         ...getEnterpriseCallSettings(enterpriseId, config.inferenceScope || "dictationCleanup"),
       }
     );

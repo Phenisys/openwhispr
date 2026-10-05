@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Plus, Sparkles } from "../icons";
 import { useToast } from "../ui/useToast";
 import NoteEditor from "./NoteEditor";
+import LocalNotesTree from "./LocalNotesTree";
 import { ContainerOverview } from "./overview/ContainerOverview";
 import NotesStructureIntroDialog from "./NotesStructureIntroDialog";
 import ActionPicker from "./ActionPicker";
@@ -61,6 +62,7 @@ import {
   setSessionExpectedCount,
 } from "../../stores/meetingRecordingStore";
 import { useNotesOnboarding } from "../../hooks/useNotesOnboarding";
+import { startRecordingForNote, useCreateNote } from "../../hooks/useCreateNote";
 import { usePolicySnapshot, useTranscriptionContextAllowed } from "../../hooks/usePolicy";
 import NotesOnboarding from "./NotesOnboarding";
 import { defaultFolderDisplayName, notesEmptyTitleKey } from "./shared";
@@ -120,16 +122,12 @@ interface PersonalNotesViewProps {
     event: any;
   } | null;
   onMeetingRecordingRequestHandled?: () => void;
-  invitationEntry?: { workspaceId: string; teamIds: string[] } | null;
-  onInvitationEntryHandled?: () => void;
 }
 
 export default function PersonalNotesView({
   onOpenSettings,
   meetingRecordingRequest,
   onMeetingRecordingRequestHandled,
-  invitationEntry,
-  onInvitationEntryHandled,
 }: PersonalNotesViewProps) {
   const isMeetingMode = useIsMeetingMode();
   const isNarrowWindow = useIsNarrowWindow();
@@ -268,38 +266,6 @@ export default function PersonalNotesView({
     }
   }, [structureIntroPending, isOnboardingComplete, isTreeLoading, isSidePanelLayout]);
 
-  // Arriving via an accepted invitation reopens the structure intro even when
-  // this device has already seen it, and even before notes onboarding is done
-  // (the dialog also renders in the onboarding branch below).
-  useEffect(() => {
-    if (invitationEntry && !isSidePanelLayout) setShowStructureIntro(true);
-  }, [invitationEntry, isSidePanelLayout]);
-
-  // The acceptance modal starts a sync before navigating here. Once the first
-  // space an invited team can access appears in the local mirror, take the
-  // user to it instead of leaving the newly shared content hidden behind
-  // Personal.
-  useEffect(() => {
-    if (!invitationEntry) return;
-    const invitedTeamIds = new Set(invitationEntry.teamIds);
-    const invitedSpace = spaces.find(
-      (space) =>
-        space.kind === "team" &&
-        space.workspace_id === invitationEntry.workspaceId &&
-        space.cloud_space_id != null &&
-        // Workspace owners/admins receive implicit access, so their invitation
-        // may not enumerate team ids. In that case, open the first accessible
-        // team space belonging to the accepted workspace.
-        (invitedTeamIds.size === 0 || space.teams.some((team) => invitedTeamIds.has(team.id)))
-    );
-    if (!invitedSpace) return;
-
-    setActiveNoteId(null);
-    revealContainer(invitedSpace.id, null);
-    setActiveContext(invitedSpace.id, null);
-    onInvitationEntryHandled?.();
-  }, [invitationEntry, onInvitationEntryHandled, spaces]);
-
   const handleStructureIntroOpenChange = useCallback((open: boolean) => {
     setShowStructureIntro(open);
     if (!open) {
@@ -335,24 +301,7 @@ export default function PersonalNotesView({
     });
   }, [activeNote?.calendar_event_id]);
 
-  const startRecordingForNote = useCallback(async (note: NoteItem | null) => {
-    const seedSegments = note?.transcript ? parseTranscriptSegments(note.transcript) : [];
-    await storeStartRecording({
-      noteId: note?.id ?? null,
-      noteTitle: note?.title ?? null,
-      folderId: note?.folder_id ?? null,
-      seedSegments,
-      diarizationEnabled: note?.diarization_enabled == null ? null : note.diarization_enabled === 1,
-      expectedCount: resolveExpectedSpeakerCount(note),
-      expectedCountIsExplicit: isExplicitSpeakerCount(note?.expected_speaker_count),
-      autoEndEligible: isMeetingAutoEndEligible(note),
-    });
-  }, []);
-
-  const startRecording = useCallback(
-    () => startRecordingForNote(activeNote ?? null),
-    [activeNote, startRecordingForNote]
-  );
+  const startRecording = useCallback(() => startRecordingForNote(activeNote ?? null), [activeNote]);
 
   const stopRecording = useCallback(async () => {
     await storeStopRecording();
@@ -488,42 +437,12 @@ export default function PersonalNotesView({
     return () => flushPendingSaves("unmount");
   }, [flushPendingSaves]);
 
-  const handleNewNoteIn = useCallback(
-    async (spaceId: number, folderId: number | null) => {
-      const result = await window.electronAPI.saveNote(
-        t("notes.list.untitledNote"),
-        "",
-        "personal",
-        null,
-        null,
-        folderId,
-        spaceId
-      );
-      if (result.success && result.note) {
-        setActiveContext(result.note.space_id, result.note.folder_id);
-        revealContainer(result.note.space_id, result.note.folder_id);
-        setActiveNoteId(result.note.id);
-        // A new note is a recording waiting to happen: start it unless one is already live.
-        if (meetingRecordingAllowed && !isTranscribing) void startRecordingForNote(result.note);
-      }
-    },
-    [t, meetingRecordingAllowed, isTranscribing, startRecordingForNote]
-  );
+  const { createNote, createNoteIn } = useCreateNote();
 
   const privateSpaceId = useMemo(
     () => spaces.find((s) => s.kind === "private")?.id ?? null,
     [spaces]
   );
-
-  const handleNewNoteInPrivate = useCallback(() => {
-    if (privateSpaceId == null) return;
-    handleNewNoteIn(privateSpaceId, null);
-  }, [privateSpaceId, handleNewNoteIn]);
-
-  const handleNewNote = useCallback(() => {
-    if (activeContext) handleNewNoteIn(activeContext.spaceId, activeContext.folderId);
-    else handleNewNoteInPrivate();
-  }, [activeContext, handleNewNoteIn, handleNewNoteInPrivate]);
 
   const handleNotesAdded = useCallback(async () => {
     if (activeFolderId) {
@@ -670,18 +589,6 @@ export default function PersonalNotesView({
   // the store — this view can be unmounted when an auto-end stop fires.
   const isActiveNoteRecording = isTranscribing && recordingNoteId === activeNote?.id;
 
-  if (!isOnboardingComplete) {
-    return (
-      <>
-        <NotesOnboarding onComplete={completeOnboarding} />
-        <NotesStructureIntroDialog
-          open={showStructureIntro}
-          onOpenChange={handleStructureIntroOpenChange}
-        />
-      </>
-    );
-  }
-
   const runNoteAction = async (action: ActionItem) => {
     if (!editorNote) return;
     const { recordingNoteId: liveNoteId, transcript: liveTranscript } =
@@ -744,6 +651,18 @@ export default function PersonalNotesView({
     if (action) void runNoteAction(action);
   };
 
+  if (!isOnboardingComplete) {
+    return (
+      <>
+        <NotesOnboarding onComplete={completeOnboarding} />
+        <NotesStructureIntroDialog
+          open={showStructureIntro}
+          onOpenChange={handleStructureIntroOpenChange}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="flex h-full">
       <div
@@ -765,6 +684,10 @@ export default function PersonalNotesView({
               {t("notes.sidebar.actions")}
             </button>
           </div>
+          <LocalNotesTree
+            onNewNote={createNoteIn}
+            onShowStructureIntro={() => setShowStructureIntro(true)}
+          />
         </div>
       </div>
 
@@ -834,7 +757,7 @@ export default function PersonalNotesView({
             space={overviewSpace}
             folder={overviewFolder}
             onOpenNote={setActiveNoteId}
-            onNewNote={handleNewNote}
+            onNewNote={createNote}
             onAddExisting={activeFolderId != null ? () => setShowAddNotesDialog(true) : undefined}
           />
         ) : (
@@ -945,7 +868,7 @@ export default function PersonalNotesView({
                 </p>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleNewNote}
+                    onClick={createNote}
                     className="flex items-center gap-1.5 px-4 h-7 rounded-md bg-primary/8 dark:bg-primary/10 border border-primary/12 dark:border-primary/15 text-xs font-medium text-primary/70 hover:bg-primary/12 hover:text-primary hover:border-primary/20 transition-colors"
                   >
                     <Plus size={11} />

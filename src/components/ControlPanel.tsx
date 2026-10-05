@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "./ui/button";
 import { BIDI_VALUE_TOKEN, BidiInterpolatedText } from "./ui/BidiInterpolatedText";
-import { Download, RefreshCw, Loader2, AlertTriangle, Zap } from "./icons";
+import { Download, RefreshCw, Loader2, AlertTriangle, Zap, Plus } from "./icons";
 import { RequiredModelsBanner } from "./RequiredModelsBanner";
 import { ConfirmDialog, AlertDialog } from "./ui/dialog";
 import { useDialogs } from "../hooks/useDialogs";
@@ -44,6 +44,7 @@ import ControlPanelTopBar from "./ControlPanelTopBar";
 import { useControlPanelNavItems, type ControlPanelView } from "./controlPanelNav";
 import MeetingRecordingMount from "./MeetingRecordingMount";
 import MeetingRecordingPill from "./notes/MeetingRecordingPill";
+import { useCreateNote } from "../hooks/useCreateNote";
 
 import { getCachedPlatform } from "../utils/platform";
 import { isAccessibilitySkipped } from "../utils/permissions";
@@ -140,6 +141,13 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   } = useUpdater();
 
   const agentAllowedByPolicy = usePolicyStore(isAgentAllowed);
+  const { createNote } = useCreateNote();
+  // The note is created before the view switches so Notes mounts with it already open.
+  // (Phenisys: plain button — the upstream NewNoteMenu team-space dropdown was purged.)
+  const handleNewNote = useCallback(async () => {
+    await createNote();
+    setActiveView("personal-notes");
+  }, [createNote]);
   const policyActionsAllowed = usePolicyStore((state) => isPolicyActionAllowed(state));
   useEffect(() => {
     if (!isControlPanelViewAllowed(activeView, agentAllowedByPolicy, policyActionsAllowed)) {
@@ -504,12 +512,22 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                     settings.translationSourceLanguage,
                     settings.translationTargetLanguage
                   ),
-                  onCleanupError: (cleanupError: Error) =>
+                  onCleanupError: (cleanupError: Error & { messageKey?: string }) => {
                     logger.warn(
                       "Cleanup step failed in translation chain, translating raw transcript",
                       { error: cleanupError.message },
                       "transcription"
-                    ),
+                    );
+                    // The chain still translates the raw transcript, so say why cleanup
+                    // was dropped rather than reporting a clean success (#2091).
+                    toast({
+                      title: t("app.toasts.cleanupFailed.title"),
+                      description: cleanupError.messageKey
+                        ? t(cleanupError.messageKey)
+                        : cleanupError.message,
+                      variant: "destructive",
+                    });
+                  },
                   onEmptyTranslate: () =>
                     logger.warn(
                       "Translation step returned empty text, keeping previous text",
@@ -559,6 +577,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                 const agentName = getAgentName();
                 const reasonedText = await ReasoningService.processText(rawText, model, agentName, {
                   disableThinking: getSettings().cleanupDisableThinking,
+                  requireCompleteOutput: true,
                 });
                 if (hasTextContent(reasonedText) && reasonedText !== rawText) {
                   const updated = await window.electronAPI.updateTranscriptionText(
@@ -571,8 +590,15 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                   }
                 }
               }
-            } catch {
-              // Reasoning failed — keep the raw STT result
+            } catch (cleanupError) {
+              // The row keeps its raw transcript, so the retry must not look like it
+              // cleaned anything — report why, the way dictation does (#2091).
+              const failure = cleanupError as Error & { messageKey?: string };
+              toast({
+                title: t("app.toasts.cleanupFailed.title"),
+                description: failure.messageKey ? t(failure.messageKey) : failure.message,
+                variant: "destructive",
+              });
             }
           }
 
@@ -824,6 +850,17 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
               onOpenSearch={() => setShowSearch(true)}
               isSidePanelLayout={isSidePanelLayout}
               onExitSidePanel={handleExitSidePanel}
+              actions={
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleNewNote}
+                  title={t("notes.list.newNote")}
+                >
+                  <Plus size={14} />
+                  {t("notes.list.newNote")}
+                </Button>
+              }
             />
             <div className="scrollbar-hidden flex-1 overflow-y-auto">
               {updateRequiredByOrg && (

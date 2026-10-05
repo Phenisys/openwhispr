@@ -17,6 +17,9 @@ export interface NoteActionState {
 export interface ActionErrorEvent {
   noteId: number;
   message: string;
+  /** Set when the failure has a translatable form; the toast prefers it. */
+  messageKey?: string;
+  messageParams?: Record<string, string | number>;
 }
 
 interface ActionProcessingStoreState {
@@ -29,6 +32,11 @@ const processingFlags = new Map<number, boolean>();
 const successTimers = new Map<number, NodeJS.Timeout>();
 
 const IDLE_STATE: NoteActionState = { status: "idle", actionName: null };
+
+// Upstream caps enhancement output at 4096 tokens. Local constant (same
+// value as upstream's builtinActions) so this store stays independent of the
+// builtinActions prompt layer, which PromptStudio now owns.
+const NOTE_OUTPUT_MAX_TOKENS = 4096;
 
 function setNoteState(noteId: number, patch: Partial<NoteActionState>) {
   const { noteStates } = useActionProcessingStore.getState();
@@ -117,10 +125,17 @@ export function runBackgroundAction(
       );
       const enhanced = await reasoningService.processText(noteContent, modelId, null, {
         systemPrompt,
+        maxTokens: NOTE_OUTPUT_MAX_TOKENS,
         temperature: 0.3,
         disableThinking: settings.noteFormattingDisableThinking,
         ...providerOverrides,
       });
+
+      // IPC-bridged providers relay whatever the model returned; a blank
+      // result must not be saved as the enhanced note.
+      if (!enhanced.trim()) {
+        throw new Error("Model returned no text");
+      }
 
       if (cancelledFlags.get(noteId)) return;
 
@@ -155,7 +170,11 @@ export function runBackgroundAction(
       processingFlags.set(noteId, false);
       clearNoteState(noteId);
       const message = err instanceof Error ? err.message : labels.actionFailed;
-      pushErrorEvent({ noteId, message });
+      const { messageKey, messageParams } = (err ?? {}) as {
+        messageKey?: string;
+        messageParams?: Record<string, string | number>;
+      };
+      pushErrorEvent({ noteId, message, messageKey, messageParams });
     } finally {
       cancelledFlags.delete(noteId);
     }
