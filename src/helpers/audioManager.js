@@ -49,7 +49,6 @@ import {
   effectiveAudioRetentionDays,
   effectiveLocalHistoryEnabled,
   isAgentAllowed,
-  isCloudBackupAllowed,
   isTranscriptionContextAllowed,
   isTranscriptionSelectionAllowed,
 } from "../stores/policyRules";
@@ -151,20 +150,6 @@ function getEffectiveRetentionPreferences() {
     dataRetentionEnabled: effectiveLocalHistoryEnabled(policyState, settings.dataRetentionEnabled),
     audioRetentionDays: effectiveAudioRetentionDays(policyState, settings.audioRetentionDays),
   };
-}
-
-// Insights sync is opt-in, so nothing analytics-only may ride along on a cloud
-// request until the user has enabled it. History retention gates it too: the
-// local write below the same gate is skipped, and the cloud must not keep rows
-// the device never recorded. Managed workspaces that forbid cloud backup forbid
-// these counters with it — they are user data leaving the device like any other.
-function analyticsSyncEnabled(settings = getSettings()) {
-  return (
-    settings.isSignedIn &&
-    settings.insightsSyncEnabled &&
-    isCloudBackupAllowed(usePolicyStore.getState()) &&
-    getEffectiveRetentionPreferences().dataRetentionEnabled
-  );
 }
 
 // Shared by the agent route and its text-only retry, which needs the prompt
@@ -3307,10 +3292,6 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     const opts = {};
     const analyticsOccurredAt = new Date(metadata.analyticsOccurredAt || Date.now());
     if (language) opts.language = language;
-    if (analyticsSyncEnabled(settings)) {
-      opts.analyticsOccurredAt = analyticsOccurredAt.toISOString();
-      opts.localDate = localDateKey(analyticsOccurredAt);
-    }
     const cleanupCloudMode = settings.cleanupCloudMode || "openwhispr";
     if (
       (settings.useCleanupModel && cleanupCloudMode === "openwhispr") ||
