@@ -145,6 +145,10 @@
     {
       "from": "resources/mediaremote-adapter/LICENSE",
       "to": "bin/mediaremote-adapter.LICENSE"
+    },
+    {
+      "from": "resources/update-feed.json",
+      "to": "update-feed.json"
     }
   ],
   "mac": {
@@ -186,10 +190,6 @@
       {
         "from": "resources/bin/nircmd.exe",
         "to": "bin/nircmd.exe"
-      },
-      {
-        "from": "resources/update-feed.json",
-        "to": "update-feed.json"
       }
     ]
   },
