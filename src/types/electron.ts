@@ -2366,7 +2366,6 @@ declare global {
 
       // Workspace invitation deep link
       onWorkspaceInvitationToken?: (callback: (token: string) => void) => () => void;
-      getPendingInvitationToken?: () => Promise<string | null>;
 
       // AssemblyAI Streaming
       assemblyAiStreamingWarmup?: (options?: { sampleRate?: number; language?: string }) => Promise<
