@@ -3,10 +3,12 @@ const fs = require("fs");
 const path = require("path");
 
 // The update feed is configurable per build: a packed update-feed.json
-// (declared in electron-builder.json extraResources) overrides the upstream
-// default. Internal builds (see release-interne.yml) ship
-// {"owner":"Phenisys","repo":"openwhispr"} so they only ever see internal
-// releases — and never upstream ones.
+// (declared in electron-builder.json extraResources) overrides the built-in
+// default. The committed resources/update-feed.json and the CI
+// (release-interne.yml) both pin {"owner":"Phenisys","repo":"openwhispr"} so
+// the fork only ever sees its own releases — and never upstream ones. The
+// fallback below is the fork too, so a missing feed file can't silently point
+// the "check for updates" button at OpenWhispr's repo.
 function resolveUpdateFeed() {
   try {
     const feedPath = path.join(process.resourcesPath, "update-feed.json");
@@ -15,9 +17,9 @@ function resolveUpdateFeed() {
       return { provider: "github", private: false, ...feed };
     }
   } catch {
-    // Missing or unreadable feed file -> upstream defaults
+    // Missing or unreadable feed file -> fork default (never the upstream repo)
   }
-  return { provider: "github", owner: "OpenWhispr", repo: "openwhispr", private: false };
+  return { provider: "github", owner: "Phenisys", repo: "openwhispr", private: false };
 }
 
 // electron-updater can only replace an AppImage on Linux; deb, rpm and tar.gz
