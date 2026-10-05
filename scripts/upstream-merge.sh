@@ -61,32 +61,56 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 65
 fi
 
-if [ -f .nvmrc ]; then
-  WANT="$(tr -d 'v \n' < .nvmrc)"
-  HAVE="$(node -v 2>/dev/null | tr -d 'v' | cut -d. -f1 || true)"
-  if [ -n "$HAVE" ] && [ "$HAVE" != "$WANT" ]; then
-    echo "ATTENTION : Node $HAVE détecté, .nvmrc demande $WANT." >&2
-    echo "            Un npm ci hors Node $WANT casse le lockfile et l'ABI better-sqlite3." >&2
+# --- Résolution du Node ---------------------------------------------------
+# Le runner de tests (`node --import tsx --test`) est SENSIBLE à la version de
+# Node : sur les Node 24 anciens (ex. 24.1.0), tsx résout mal les exports nommés
+# des modules .ts importés dynamiquement → des MILLIERS de faux échecs
+# (`TypeError: X is not a function`). On choisit donc, parmi les Node du majeur
+# demandé par .nvmrc, le plus RÉCENT installé (nvm et fnm), et on le VALIDE par
+# une sonde tsx : un `--verify` rouge doit être un VRAI échec, jamais un artefact
+# de version. Un Node d'un autre majeur est refusé (ABI better-sqlite3 / lockfile).
+WANT_NODE="$(tr -d 'v \n' < .nvmrc 2>/dev/null || echo 24)"
+WANT_MAJOR="${WANT_NODE%%.*}"
+NODE_BIN=""
+NODE_OK=0
+
+node_major() { # $1 = répertoire bin
+  "$1/node" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo "?"
+}
+
+node_candidates() {
+  local active
+  active="$(command -v node 2>/dev/null || true)"
+  [ -n "$active" ] && dirname "$active"
+  { ls -d "${NVM_DIR:-$HOME/.nvm}/versions/node/v${WANT_MAJOR}"*/bin 2>/dev/null
+    ls -d "${FNM_DIR:-$HOME/.local/share/fnm}/node-versions/v${WANT_MAJOR}"*/installation/bin 2>/dev/null
+  } | sort -V -r
+}
+
+node_tsx_ok() { # $1 = répertoire bin
+  [ -x "$1/node" ] || return 1
+  [ "$(node_major "$1")" = "$WANT_MAJOR" ] || return 1
+  local probe_dir
+  probe_dir="$(mktemp -d)"
+  printf 'export const PROBE = 1;\n' > "$probe_dir/probe.ts"
+  PATH="$1:$PATH" node --import tsx \
+    -e "import('file://$probe_dir/probe.ts').then((m) => process.exit(m.PROBE === 1 ? 0 : 1)).catch(() => process.exit(1))" \
+    >/dev/null 2>&1
+  local rc=$?
+  rm -rf "$probe_dir"
+  return "$rc"
+}
+
+while IFS= read -r candidate; do
+  if node_tsx_ok "$candidate"; then
+    NODE_BIN="$candidate"
+    NODE_OK=1
+    break
   fi
-  # Résolution de la bonne version : nvm chargé, sinon installation nvm directe,
-  # sinon PATH. Évite un faux échec de tests (ABI better-sqlite3) et un lockfile
-  # régénéré avec le mauvais majeur, même quand nvm n'est pas chargé dans le shell.
-  NODE_BIN=""
-  if command -v nvm >/dev/null 2>&1; then
-    NODE_BIN=""
-    NVM_MODE=1
-  else
-    NVM_MODE=0
-    for d in "${NVM_DIR:-$HOME/.nvm}/versions/node/v$WANT"* ; do
-      if [ -x "$d/bin/npm" ]; then NODE_BIN="$d/bin"; break; fi
-    done
-  fi
-fi
+done < <(node_candidates)
 
 run_with_node() {
-  if [ "${NVM_MODE:-0}" = "1" ]; then
-    nvm exec "$(tr -d 'v \n' < .nvmrc)" "$@"
-  elif [ -n "${NODE_BIN:-}" ]; then
+  if [ -n "${NODE_BIN:-}" ]; then
     PATH="$NODE_BIN:$PATH" "$@"
   else
     "$@"
@@ -141,18 +165,21 @@ esac
 
 if [ "$VERIFY" = "1" ]; then
   echo
-  echo "-- vérifications (Node $(tr -d 'v \n' < .nvmrc)) --"
-  if [ "${NVM_MODE:-0}" != "1" ] && [ -z "${NODE_BIN:-}" ]; then
-    echo "Node $(tr -d 'v \n' < .nvmrc) introuvable (nvm non chargé, aucune installation locale) :" >&2
-    echo "  lancer manuellement en Node $(tr -d 'v \n' < .nvmrc) :" >&2
-    echo "  npm ci && npm test && npm run lint && npm run typecheck && npm run build:renderer" >&2
-  else
-    run_with_node npm ci
-    run_with_node npm test
-    run_with_node npm run lint
-    run_with_node npm run typecheck
-    run_with_node npm run build:renderer
+  echo "-- vérifications (Node ${WANT_NODE} ; choisi : ${NODE_BIN:-PATH}) --"
+  if [ "$NODE_OK" != "1" ]; then
+    echo "ERREUR : aucun Node ${WANT_MAJOR} utilisable — la sonde tsx échoue sur tous les candidats." >&2
+    echo "  Le runner de tests casse sur les Node ${WANT_MAJOR} anciens (ex. 24.1.0) : tsx y résout mal" >&2
+    echo "  les exports nommés des modules .ts importés dynamiquement (milliers de faux échecs)." >&2
+    echo "  Installez un Node ${WANT_MAJOR} récent (\`fnm install 24 && fnm use 24\`, ou \`nvm install 24.21\`)," >&2
+    echo "  puis relancez :" >&2
+    echo "    npm ci && npm test && npm run lint && npm run typecheck && npm run build:renderer" >&2
+    exit 70
   fi
+  run_with_node npm ci
+  run_with_node npm test
+  run_with_node npm run lint
+  run_with_node npm run typecheck
+  run_with_node npm run build:renderer
 fi
 
 exit "$RESOLVE_RC"
