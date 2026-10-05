@@ -10,6 +10,7 @@ import {
   selectPolicyEffectiveSettings,
   selectResolvedLLMConfig,
   setResolvedLLMConfig,
+  type ResolvedLLMConfig,
 } from "../../stores/settingsStore";
 import { usePolicyModeOptions, usePolicySnapshot } from "../../hooks/usePolicy";
 import { InferenceModeSelector } from "../ui/SettingsSection";
@@ -18,7 +19,11 @@ import ReasoningModelSelector from "../ReasoningModelSelector";
 import OpenAICompatiblePanel from "../OpenAICompatiblePanel";
 import { Toggle } from "../ui/toggle";
 import type { InferenceMode } from "../../types/electron";
-import type { InferenceScope } from "../../config/inferenceScopes";
+import {
+  INFERENCE_SCOPES,
+  type InferenceScope,
+  type InferenceScopeDefinition,
+} from "../../config/inferenceScopes";
 import {
   isProviderValidForMode,
   getCloudModel,
@@ -52,9 +57,15 @@ export default function InferenceConfigEditor({
   const { t } = useTranslation();
   const policyState = usePolicySnapshot();
   const config = useSettingsStore(
-    useShallow((settings) =>
-      selectResolvedLLMConfig(selectPolicyEffectiveSettings(settings, policyState), scope)
-    )
+    useShallow((settings): ResolvedLLMConfig => {
+      const effective = selectPolicyEffectiveSettings(settings, policyState);
+      const resolved = selectResolvedLLMConfig(effective, scope);
+      const definition: InferenceScopeDefinition = INFERENCE_SCOPES[scope];
+      // Inherited runtime defaults are not an explicit selection in an optional picker.
+      return definition.optional
+        ? { ...resolved, model: effective[definition.storeKeys.model] as string }
+        : resolved;
+    })
   );
   const localInferenceTimeoutMs = useSettingsStore((s) => s.localInferenceTimeoutMs);
   const setLocalInferenceTimeoutMs = useSettingsStore((s) => s.setLocalInferenceTimeoutMs);

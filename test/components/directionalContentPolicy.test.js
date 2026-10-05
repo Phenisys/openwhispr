@@ -148,7 +148,6 @@ test("user-authored names and previews detect direction at their display boundar
       "src/components/notes/MeetingTranscriptChat.tsx",
       /<span\s+dir="auto"[^>]*>\s*\{displayLabel\}/,
     ],
-    ["src/components/notes/NoteEditor.tsx", /<span\s+dir="auto"[^>]*>\s*\{space\.name\}/],
     ["src/components/notes/NoteEditor.tsx", /<span\s+dir="auto"[^>]*>\s*\{folderName\}/],
     [
       "src/components/notes/NoteEditor.tsx",

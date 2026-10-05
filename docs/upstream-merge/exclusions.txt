@@ -139,7 +139,7 @@ test/services/syncPassPolicy.test.js
 test/services/teamRosterCache.test.js
 test/utils/billingSeatIntent.test.js
 
-[excluded]  # 58 fichiers amont exclus (arrivés sans conflit)
+[excluded]  # 69 fichiers amont exclus (arrivés sans conflit)
 src/assets/icons/microsoft-calendar.svg
 src/assets/icons/microsoft-calendar.webp
 src/components/CompactAuthenticationFlow.tsx
@@ -199,6 +199,23 @@ test/stores/enterpriseIdentityStoreEnforcement.test.js
 test/stores/enterpriseIdentityStoreImports.test.js
 test/utils/managedAzureTranscriptionUrl.test.js
 
+# Fusion v1.10.2 (2026-10-05) — espaces/équipes/membres ré-ajoutés par
+# l'amont, supprimés (`git rm`) car couche exclue. SpaceNameField et
+# useMemberRoster sont génériques en soi mais uniquement référencés par
+# des fichiers exclus (SpaceSettingsDialog / SpaceMembersPanel).
+# Les 3 tests couvraient les modules supprimés (NewNoteMenu /
+# useCanCreateTeamSpace / SpacesService+InvitationsService purgés).
+src/components/MemberRoster.tsx
+src/components/notes/NewNoteMenu.tsx
+src/components/notes/SpaceGroupsSection.tsx
+src/components/notes/SpaceMembersPanel.tsx
+src/components/notes/SpaceNameField.tsx
+src/components/notes/SpaceSettingsDialog.tsx
+src/hooks/useCanCreateTeamSpace.ts
+src/hooks/useMemberRoster.ts
+test/components/newNoteMenu.test.js
+test/hooks/canCreateTeamSpace.test.js
+test/services/spacesService.test.js
 
 # Restaurations du 2026-09-12 (fusion v1.10.0, nettoyage du câblage) — ces
 # chemins ont été retirés de [excluded] parce que le fork CONSERVE la

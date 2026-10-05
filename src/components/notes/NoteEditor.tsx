@@ -9,30 +9,13 @@ import {
   MessageSquareText,
   Mic,
   LinkIcon,
-  Link2,
-  Lock,
   FolderOpen,
   Search,
+  Download,
   Plus,
   Check,
-  Users,
 } from "../icons";
-import {
-  canOrganizeNote,
-  noteCapabilities,
-  resolveNotePermission,
-  type NoteAclState,
-} from "../../lib/notePermissions";
-import {
-  useShareCacheEntry,
-  useNoteConflict,
-  useSpaces,
-  clearNoteConflict,
-  navigateToContainer,
-  persistNoteShareState,
-  updateNoteInStore,
-  updateShareCache,
-} from "../../stores/noteStore";
+import { useNoteConflict, clearNoteConflict, updateNoteInStore } from "../../stores/noteStore";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import type { Editor } from "@tiptap/react";
 import { MeetingTranscriptChat, SelectionBar } from "./MeetingTranscriptChat";
@@ -48,6 +31,7 @@ import {
   DropdownMenuSeparator,
 } from "../ui/dropdown-menu";
 import { cn } from "../lib/utils";
+import { SPLIT_BUTTON_GROUP_CLASS, SPLIT_BUTTON_SEGMENT_CLASS } from "../ui/splitButton";
 import type { NoteItem, FolderItem } from "../../types/electron";
 import type { ActionProcessingState } from "../../hooks/useActionProcessing";
 import ActionProcessingOverlay from "./ActionProcessingOverlay";
@@ -68,14 +52,15 @@ import {
 import NoteParticipants from "./NoteParticipants";
 import type { CalendarAttendee } from "../../types/calendar";
 import { observeFloatingChatLayout } from "./floatingChatLayout";
-import { NOTE_META_CHIP_CLASS, defaultFolderDisplayName, folderMatchesQuery } from "./shared";
+import {
+  NOTE_META_CHIP_CLASS,
+  defaultFolderDisplayName,
+  folderMatchesQuery,
+  shouldOfferMeetingSummary,
+} from "./shared";
 
 const SEGMENT_BUTTON_CLASS =
   "relative z-1 flex h-[26px] items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors duration-150";
-const SHARE_GROUP_CLASS =
-  "flex h-[30px] items-stretch overflow-hidden rounded-full border border-border bg-surface-3 dark:border-white/10 dark:bg-surface-2";
-const SHARE_SEGMENT_CLASS =
-  "flex items-center text-xs font-medium text-foreground/80 outline-none transition-colors duration-150 hover:bg-surface-raised hover:text-foreground focus-visible:bg-surface-raised dark:hover:bg-surface-3";
 
 /** Option d'export affichee dans le menu d'export de la note. */
 type NoteExportOption = {
@@ -240,42 +225,15 @@ export default function NoteEditor({
 }: NoteEditorProps) {
   const { t } = useTranslation();
   const locale = useUiLocale();
-  const [viewMode, setViewMode] = useState<MeetingViewMode>("raw");
+  const defaultViewMode: MeetingViewMode = enhancement ? "enhanced" : "raw";
+  const [viewMode, setViewMode] = useState<MeetingViewMode>(defaultViewMode);
   const [chatMode, setChatMode] = useState<EmbeddedChatMode>("hidden");
   const [folderSearch, setFolderSearch] = useState("");
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [isDiarizing, setIsDiarizing] = useState(false);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [shareIntent, setShareIntent] = useState<"open" | "copy-link">("open");
-  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
-  const shareCache = useShareCacheEntry(note.cloud_id);
-  const spaces = useSpaces();
-  const space = useMemo(
-    () => spaces.find((s) => s.id === note.space_id) ?? null,
-    [spaces, note.space_id]
-  );
-  const isTeamNote = space?.kind === "team";
-  // Persisted flag is the restart-safe truth; the live cache overlays it for
-  // the current session (it reflects server state before the flag persists).
-  const isShared = shareCache ? shareCache.share.visibility !== "private" : Boolean(note.is_shared);
-  // Le partage de notes est retire avec la couche compte : aucune ACL distante.
-  const aclState: NoteAclState = "unavailable";
-  const notePermission = resolveNotePermission({
-    cachedPermission: shareCache?.access?.my_permission,
-    aclState,
-    isTeamNote,
-    locallyOwned: true,
-  });
-  const shareCapabilities = noteCapabilities(notePermission);
-  const canEditNote = shareCapabilities.canEdit;
-  // Re-filing is owner-only on shared personal notes (a denied folder_id
-  // PATCH would fork an unexpected Personal copy); team members keep
-  // same-space folder moves.
-  const canMoveToFolders = canOrganizeNote(notePermission, {
-    isTeamNote,
-    hasCloudCopy: Boolean(note.cloud_id),
-  });
+  const canEditNote = true;
+  const canMoveToFolders = true;
   // A newer cloud copy arrived while this note had unpushed edits (plan §7.3).
   const conflict = useNoteConflict(note.client_note_id);
   const [conflictEditorName, setConflictEditorName] = useState<string | null>(null);
@@ -319,15 +277,15 @@ export default function NoteEditor({
   }, [diarizedSegments, note.transcript]);
 
   const hasChatSegments = displaySegments.length > 0;
-  // A finished recording with no AI summary yet offers one from the transcript view.
   const showSummaryCallout =
-    viewMode === "transcript" &&
-    !isRecording &&
-    hasChatSegments &&
-    !enhancement &&
-    canEditNote &&
     !!onGenerateSummary &&
-    actionProcessingState !== "processing";
+    shouldOfferMeetingSummary({
+      isRecording,
+      hasTranscriptSegments: hasChatSegments,
+      hasSummary: !!enhancement,
+      canEdit: canEditNote,
+      isProcessingAction: actionProcessingState === "processing",
+    });
 
   const knownSpeakers = useMemo(
     () => buildKnownSpeakers(speakerProfiles, displaySegments, speakerMappings),
@@ -416,14 +374,14 @@ export default function NoteEditor({
         setDiarizedSegments(null);
         setIsDiarizing(false);
         setSpeakerMappings({});
-        setViewMode("raw");
+        setViewMode(defaultViewMode);
         if (titleRef.current && titleRef.current.textContent !== note.title) {
           titleRef.current.textContent = note.title || "";
         }
         editorRef.current?.commands.focus();
       });
     }
-  }, [note.id, note.title, scheduleUiUpdate]);
+  }, [note.id, note.title, defaultViewMode, scheduleUiUpdate]);
 
   useEffect(() => {
     window.electronAPI?.getSpeakerMappings?.(note.id).then((mappings) => {
@@ -721,11 +679,6 @@ export default function NoteEditor({
   const noteDate = formatNoteDate(note.created_at, locale);
   const shortDate = formatShortDate(note.created_at, locale);
 
-  const openShare = useCallback((intent: "open" | "copy-link") => {
-    setShareIntent(intent);
-    setShareDialogOpen(true);
-  }, []);
-
   const exportOptions = useMemo<NoteExportOption[]>(() => {
     if (viewMode === "transcript" && onExportTranscript) {
       return (["txt", "srt", "md", "json"] as const).map((format) => ({
@@ -772,31 +725,7 @@ export default function NoteEditor({
                 <span className="max-w-40 truncate">{calendarEventName}</span>
               </span>
             )}
-            {isTeamNote && space && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => navigateToContainer(space.id, null)}
-                  className={NOTE_META_CHIP_CLASS}
-                >
-                  {space.emoji ? (
-                    <span className="text-[11px] leading-none shrink-0" aria-hidden="true">
-                      {space.emoji}
-                    </span>
-                  ) : (
-                    <Users size={14} className="shrink-0 text-foreground/60" />
-                  )}
-                  <span dir="auto" className="truncate max-w-32">
-                    {space.name}
-                  </span>
-                </button>
-                {folders && onMoveToFolder && (canMoveToFolders || folderName) && (
-                  <span aria-hidden="true" className="text-xs text-foreground/45">
-                    /
-                  </span>
-                )}
-              </>
-            )}
+
             {folders && onMoveToFolder && !canMoveToFolders && folderName && (
               <span className={cn(NOTE_META_CHIP_CLASS, "cursor-default")}>
                 <FolderOpen size={14} className="shrink-0 text-foreground/60" />
@@ -906,18 +835,7 @@ export default function NoteEditor({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {isTeamNote && space?.cloud_space_id && (
-              <button
-                type="button"
-                onClick={() => setMembersDialogOpen(true)}
-                aria-label={t("notes.spaces.teamsMembers.title", { space: space.name })}
-                className={NOTE_META_CHIP_CLASS}
-              >
-                <Users size={14} className="shrink-0 text-foreground/60" />
-                {/* member_count tracks explicit rosters only — the audience always includes the viewer */}
-                {Math.max(1, space.member_count ?? 1)}
-              </button>
-            )}
+
             {isSaving && (
               <span className="inline-flex items-center gap-1 text-xs text-foreground/45 tabular-nums">
                 <Loader2 size={10} className="animate-spin" />
@@ -976,7 +894,7 @@ export default function NoteEditor({
                     )}
                   >
                     <Sparkles size={12} />
-                    {t("notes.editor.enhanced")}
+                    {t("notes.editor.aiSummary")}
                     {enhancement.isStale && (
                       <span
                         className="h-1 w-1 rounded-full bg-amber-400/60"
@@ -997,25 +915,30 @@ export default function NoteEditor({
                   onStop={onStopRecording}
                 />
               )}
-              <div className={SHARE_GROUP_CLASS}>
-                <button
-                  type="button"
-                  onClick={() => openShare("open")}
-                  className={cn(SHARE_SEGMENT_CLASS, "gap-1.5 ps-2.5 pe-3")}
-                >
-                  <Lock size={13} className={isShared ? "text-primary" : "text-foreground/60"} />
-                  {t("noteEditor.share.button")}
-                </button>
-                <span aria-hidden="true" className="my-1.5 w-px bg-border dark:bg-white/10" />
-                <button
-                  type="button"
-                  onClick={() => openShare("copy-link")}
-                  aria-label={t("noteEditor.share.dialog.copyLink")}
-                  className={cn(SHARE_SEGMENT_CLASS, "w-[30px] justify-center")}
-                >
-                  <Link2 size={13} className="text-foreground/60" />
-                </button>
-              </div>
+              {exportOptions.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        SPLIT_BUTTON_GROUP_CLASS,
+                        SPLIT_BUTTON_SEGMENT_CLASS,
+                        "h-[30px] gap-1.5 px-3"
+                      )}
+                    >
+                      <Download size={13} className="text-foreground/60" />
+                      {t("notes.editor.export")}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {exportOptions.map((option) => (
+                      <DropdownMenuItem key={option.id} onSelect={option.onSelect}>
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </div>

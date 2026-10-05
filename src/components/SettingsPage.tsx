@@ -639,12 +639,25 @@ function TranscriptionSection({
     />
   );
 
-  // Local decoding still serves meetings and uploads under a managed-config
-  // error, so this stays a card alongside the rest of the section (including
-  // the GPU selector below) instead of an early return that hides it.
-
   return (
     <div className="space-y-4">
+      <InferenceModeSelector
+        modes={transcriptionModes}
+        activeMode={effectiveTranscriptionMode}
+        onSelect={handleTranscriptionModeSelect}
+      />
+      {effectiveTranscriptionMode === "providers" && renderTranscriptionPicker("cloud")}
+      {effectiveTranscriptionMode === "local" && renderTranscriptionPicker("local")}
+      {previewAvailable && renderPreviewToggle()}
+      {effectiveTranscriptionMode === "self-hosted" && (
+        <SelfHostedPanel
+          service="transcription"
+          url={remoteTranscriptionUrl}
+          onUrlChange={setRemoteTranscriptionUrl}
+          model={remoteTranscriptionModel}
+          onModelChange={setRemoteTranscriptionModel}
+        />
+      )}
       {/* Local decoding still serves meetings and uploads, so the GPU choice stays reachable. */}
       <GpuDeviceSelector purpose="transcription" />
     </div>
@@ -3362,9 +3375,7 @@ EOF`,
                                     "settingsPage.developer.resetAll.successDescription"
                                   ),
                                 });
-                                setTimeout(() => {
-                                  window.location.reload();
-                                }, 1000);
+                                setTimeout(() => window.electronAPI?.relaunchApp(), 1000);
                               } catch {
                                 showAlertDialog({
                                   title: t("settingsPage.developer.resetAll.failedTitle"),

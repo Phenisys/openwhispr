@@ -34,12 +34,27 @@ est une décision d'exclusion — à relire et à versionner comme du code.
 
 ```bash
 git add -A && git commit                       # finalise le merge
-nvm exec 24 npm ci && nvm exec 24 npm test && nvm exec 24 npm run lint \
-  && nvm exec 24 npm run typecheck && nvm exec 24 npm run build:renderer
+scripts/upstream-merge.sh <tag> --verify       # sélectionne un Node 24 sain puis vérifie
+# ou, à la main (avec un Node 24 RÉCENT sur le PATH) :
+npm ci && npm test && npm run lint && npm run typecheck && npm run build:renderer
 ```
 
-**Node 24 obligatoire** (`.nvmrc`) : un `npm ci` avec une autre version casse le
-lockfile et l'ABI de `better-sqlite3` (faux échecs de tests).
+**Node 24 obligatoire — et RÉCENT** (`.nvmrc`). Deux pièges distincts :
+
+1. **Majeur ≠ 24** : `npm ci` casse le lockfile et l'ABI de `better-sqlite3`
+   (faux échecs de tests).
+2. **Node 24 ANCIEN** (ex. **24.1.0**, version par défaut de certains `nvm`) :
+   le **runner de tests** casse. Avec `--import tsx`, les exports nommés des
+   modules `.ts` importés dynamiquement se résolvent mal → des **milliers de faux
+   échecs** (`TypeError: X is not a function`). Symptôme typique : `npm test` rouge
+   en masse **alors que** lint / typecheck / build passent. Remède : un Node 24
+   récent (`fnm install 24 && fnm use 24`, ou `nvm install 24.21`) — **vérifié bon
+   en 24.21.0**, qui est aussi ce que la CI `setup-node "24"` résout.
+
+`scripts/upstream-merge.sh --verify` sélectionne désormais lui-même le Node 24 le
+plus récent installé (nvm **et** fnm) et le **valide par une sonde tsx** : si aucun
+n'est sain, il s'arrête avec un message explicite (code 70) plutôt que de rapporter
+de faux échecs. Il ne retombe jamais sur un autre majeur.
 
 ## Historique des décisions
 

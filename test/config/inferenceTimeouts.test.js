@@ -61,13 +61,13 @@ test("request timeouts honor the resolved config at every abort point", () => {
   const openai = read("services/ai/inferenceProviders/openai.ts");
   assert.match(
     openai,
-    /config\.timeoutMs \?\? getLlmRequestTimeoutSeconds\(\) \* 1000/,
+    /config\.timeoutMs \?\? timeoutSeconds \* 1000/,
     "openai provider"
   );
   const gemini = read("services/ai/inferenceProviders/gemini.ts");
   assert.match(gemini, /config\.timeoutMs \?\? timeoutSeconds \* 1000/, "gemini provider");
   const tinfoil = read("services/ai/inferenceProviders/tinfoil.ts");
-  assert.match(tinfoil, /config\.timeoutMs \?\? timeoutMs/, "tinfoil provider");
+  assert.match(tinfoil, /config\.timeoutMs \?\? timeoutSeconds \* 1000/, "tinfoil provider");
 });
 
 test("local llama timeout is configurable end to end", () => {

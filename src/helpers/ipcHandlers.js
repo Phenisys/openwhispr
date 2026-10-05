@@ -2,6 +2,7 @@ const { ipcMain, app, shell, BrowserWindow, systemPreferences, net, session } = 
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { isRestorablePasteTarget } = require("./windowsPasteTarget");
 const crypto = require("crypto");
 const debugLogger = require("./debugLogger");
 const { ANALYTICS_HISTORY_BACKFILL_VERSION } = require("./analytics");
@@ -76,6 +77,7 @@ const diarizationHost = (endpoint) => {
 };
 const { resolveLocalServerNeeds } = require("./localServerPolicy");
 const autoStart = require("./autoStart");
+const { getRelaunchOptions, getRelaunchWaiter } = require("./autoStartPolicy");
 const HyprlandShortcutManager = require("./hyprlandShortcut");
 const AssemblyAiStreaming = require("./assemblyAiStreaming");
 const { i18nMain, changeLanguage } = require("./i18nMain");
@@ -95,7 +97,6 @@ const AudioStorageManager = require("./audioStorage");
 const LocalModelDownloadStatus = require("./localModelDownloadStatus");
 const AgentStreamRequestRegistry = require("./agentStreamRequestRegistry");
 const createMeetingTranscriptionLifecycle = require("./meetingTranscriptionLifecycle");
-const { registerMeetingAutoEndLifecycleHandlers } = require("./meetingAutoEndLifecycle");
 const liveSpeakerIdentifier = require("./liveSpeakerIdentifier");
 const { supportsLiveSpeakerIdentification } = require("./liveSpeakerIdPolicy");
 const MeetingEchoLeakDetector = require("./meetingEchoLeakDetector");
@@ -139,6 +140,8 @@ const {
   DEFAULT_EXPECTED_SPEAKER_COUNT,
   MAX_SPEAKER_COUNT,
 } = require("../constants/speakerDetection.json");
+const { UPLOAD_AUDIO_EXTENSIONS } = require("../constants/uploadAudioFormats.json");
+const { providerContentType, prepareProviderUpload } = require("./providerUploadAudio");
 const {
   DEFAULT_WHISPER_VAD_CONFIG,
   sanitizeWhisperVadConfig,
@@ -175,18 +178,6 @@ const AUTO_LEARN_DEBOUNCE_MS = 1500;
 // the message reports the cap that actually applied.
 const byokSizeCapError = (sizeCapBytes) =>
   `File too large. Maximum size for bring-your-own-key is ${Math.floor(sizeCapBytes / (1024 * 1024))} MB.`;
-
-const AUDIO_MIME_TYPES = {
-  mp3: "audio/mpeg",
-  wav: "audio/wav",
-  m4a: "audio/mp4",
-  webm: "audio/webm",
-  ogg: "audio/ogg",
-  oga: "audio/ogg",
-  flac: "audio/flac",
-  aac: "audio/aac",
-  opus: "audio/ogg",
-};
 
 const CLOUD_INLINE_LIMIT = 4 * 1024 * 1024;
 // The enterprise "Test Connection" probe only needs one word back, but the
@@ -589,6 +580,11 @@ async function chunkedCloudTranscribe({
   }
 }
 
+// Cleanup toast wording for replies the main-process providers reject; mirror
+// TRUNCATED_/EMPTY_OUTPUT_MESSAGE_KEY in services/ai/chatRequestBody.ts (#2091).
+const CLEANUP_TRUNCATED_MESSAGE_KEY = "hooks.audioRecording.errorDescriptions.cleanupTruncated";
+const CLEANUP_EMPTY_REPLY_MESSAGE_KEY = "hooks.audioRecording.errorDescriptions.cleanupEmptyReply";
+
 class IPCHandlers {
   constructor(managers) {
     this.environmentManager = managers.environmentManager;
@@ -664,6 +660,8 @@ class IPCHandlers {
     this._setupTextEditMonitor();
     this._setupRetentionCleanup();
     this._logDetectedGpus();
+    // Warm the OS default mic answer before the first hotkey press (~2s on Windows).
+    resolveSystemDefaultMicrophone();
     this.setupHandlers();
     // Lives for the app's lifetime; IPCHandlers has no teardown path.
     tokenStore.subscribe(({ generation, token }) => {
@@ -1517,6 +1515,11 @@ class IPCHandlers {
     ipcMain.handle("set-main-window-interactivity", (event, shouldCapture) => {
       this.windowManager.setMainWindowInteractivity(Boolean(shouldCapture));
       return { success: true };
+    });
+
+    ipcMain.handle("set-main-window-input-region", (event, region) => {
+      if (event.sender !== this.windowManager.mainWindow?.webContents) return null;
+      return this.windowManager.setMainWindowInputRegion(region);
     });
 
     ipcMain.handle("get-main-window-horizontal-direction", () => {
@@ -2781,12 +2784,7 @@ class IPCHandlers {
       if (options.multiple === true) properties.push("multiSelections");
       const result = await dialog.showOpenDialog({
         properties,
-        filters: [
-          {
-            name: "Audio Files",
-            extensions: ["mp3", "wav", "m4a", "webm", "ogg", "oga", "flac", "aac", "opus"],
-          },
-        ],
+        filters: [{ name: "Audio and Video Files", extensions: UPLOAD_AUDIO_EXTENSIONS }],
       });
       if (result.canceled || !result.filePaths.length) {
         return { canceled: true };
@@ -2995,9 +2993,20 @@ class IPCHandlers {
       // paste lands in the field the user was dictating into, not wherever focus
       // drifted during transcription (#859). macOS handles this via
       // activateTargetPid above; Linux re-detects the target inside pasteLinux.
-      const targetWindow =
+      const winTarget =
         process.platform === "win32"
-          ? ((await this.selectionManager?.getWinTargetHwnd?.()) ?? null)
+          ? ((await this.selectionManager?.getWinTarget?.()) ?? null)
+          : null;
+      const targetWindow =
+        winTarget &&
+        isRestorablePasteTarget({
+          target: winTarget,
+          ownExeName: path.basename(process.execPath),
+          ownWindowHandles: BrowserWindow.getAllWindows()
+            .filter((win) => !win.isDestroyed())
+            .map((win) => win.getNativeWindowHandle()),
+        })
+          ? winTarget.id
           : null;
 
       const pasteResult = await this.clipboardManager.pasteText(textToPaste, {
@@ -3767,6 +3776,47 @@ class IPCHandlers {
 
     ipcMain.handle("cancel-diarization-download", async () => {
       return this.diarizationManager.cancelDownload();
+    });
+
+    // Under `npm run dev` the Vite server dies with Electron, so a relaunched dev
+    // instance would have no renderer: just quit there.
+    ipcMain.handle("relaunch-app", async () => {
+      if (process.env.NODE_ENV === "development") return app.quit();
+      // Once Squirrel.Mac holds a downloaded update it installs it on this quit regardless
+      // of any flag, so the updater owns that restart instead of racing app.relaunch().
+      if (this.updateManager.hasStagedUpdate()) {
+        const { success } = await this.updateManager
+          .installUpdate()
+          .catch(() => ({ success: false }));
+        if (success) return;
+      }
+      this.updateManager.deferInstallOnQuit();
+      const { launcherPath, args } = getRelaunchOptions({
+        argv: process.argv,
+        protocol: this.oauthProtocol,
+        appImagePath: process.env.APPIMAGE,
+        portableExecutablePath: process.env.PORTABLE_EXECUTABLE_FILE,
+      });
+      if (launcherPath) {
+        const waiter = getRelaunchWaiter({
+          platform: process.platform,
+          launcherPath,
+          args,
+          pid: process.pid,
+          ppid: process.ppid,
+          systemRoot: process.env.SystemRoot,
+        });
+        require("child_process")
+          .spawn(waiter.file, waiter.args, {
+            detached: true,
+            stdio: "ignore",
+            cwd: path.dirname(launcherPath), // never inside the directory being removed
+          })
+          .unref();
+      } else {
+        app.relaunch({ args });
+      }
+      app.quit();
     });
 
     ipcMain.handle("cleanup-app", async (event) => {
@@ -4767,7 +4817,9 @@ class IPCHandlers {
               config?.requireCompleteOutput &&
               ["length", "max-tokens", "max_tokens"].includes(finishReason)
             ) {
-              throw new Error("Model output was truncated before the selection edit completed");
+              throw Object.assign(new Error("Model output was truncated"), {
+                messageKey: CLEANUP_TRUNCATED_MESSAGE_KEY,
+              });
             }
 
             return { success: true, text: (generated || "").trim() };
@@ -4787,7 +4839,9 @@ class IPCHandlers {
           return {
             success: false,
             error: mapped.message,
-            messageKey: mapped.messageKey,
+            // mapEnterpriseError matches provider failures, so a truncation falls through
+            // to its generic mapping — keep the key the throw site set.
+            messageKey: err.messageKey || mapped.messageKey,
             messageParams: mapped.messageParams,
             action: mapped.action,
             actionKey: mapped.actionKey,
@@ -5080,7 +5134,15 @@ class IPCHandlers {
         const result = await LocalReasoningService.processText(text, modelId, config);
         return { success: true, text: result };
       } catch (error) {
-        return { success: false, error: error.message };
+        // code/details carry the machine-readable failure across to the
+        // renderer, which owns the translation keys. Flattening to a bare
+        // string is how llama.cpp JSON used to reach users (#2142).
+        return {
+          success: false,
+          error: error.message,
+          code: error.code,
+          details: error.details,
+        };
       }
     });
 
@@ -5154,16 +5216,20 @@ class IPCHandlers {
 
           const data = await response.json();
           if (config?.requireCompleteOutput && data.stop_reason === "max_tokens") {
-            throw new Error("Model output was truncated before the selection edit completed");
+            throw Object.assign(new Error("Model output was truncated"), {
+              messageKey: CLEANUP_TRUNCATED_MESSAGE_KEY,
+            });
           }
           const outputText = extractAnthropicText(data);
           if (outputText === null) {
-            throw new Error(describeMissingAnthropicText(data));
+            throw Object.assign(new Error(describeMissingAnthropicText(data)), {
+              messageKey: CLEANUP_EMPTY_REPLY_MESSAGE_KEY,
+            });
           }
           return { success: true, text: outputText };
         } catch (error) {
           debugLogger.error("Anthropic reasoning error:", error);
-          return { success: false, error: error.message };
+          return { success: false, error: error.message, messageKey: error.messageKey };
         }
       }
     );
@@ -5580,18 +5646,6 @@ class IPCHandlers {
     });
 
     ipcMain.handle("open-calendar-privacy-settings", () => openSystemSettings("calendars"));
-
-    ipcMain.handle("show-emoji-panel", () => {
-      try {
-        if (app.isEmojiPanelSupported()) {
-          app.showEmojiPanel();
-          return true;
-        }
-      } catch (error) {
-        debugLogger.error("Failed to show native emoji panel:", error);
-      }
-      return false;
-    });
 
     ipcMain.handle("toggle-media-playback", () => {
       const mediaPlayer = require("./mediaPlayer");
@@ -6840,6 +6894,7 @@ class IPCHandlers {
           const connectOpts = {
             model: options.model,
             language: options.language,
+            mode: options.mode,
             preconfigured: options.mode !== "byok",
             environment: options.environment,
             tenant: options.tenant,
@@ -7050,6 +7105,7 @@ class IPCHandlers {
       const connectOpts = {
         model: options.model,
         language: options.language,
+        mode: options.mode,
         preconfigured: options.mode !== "byok",
         environment: options.environment,
         tenant: options.tenant,
@@ -8227,6 +8283,7 @@ class IPCHandlers {
           sessionId: recordingSessionId,
           autoEndEligible: options.autoEndEligible === true,
           ownerWebContents: event.sender,
+          noteId: options.noteId ?? null,
           // Renderer loopback may still fail after main chooses its strategy.
           // Auto-end stays fail-safe until the renderer confirms a real source.
           systemAudioAvailable: false,
@@ -9468,6 +9525,7 @@ class IPCHandlers {
     ipcMain.handle("transcribe-audio-file-cloud", async (event, filePath, opts = {}) => {
       const requestId = typeof opts?.requestId === "string" ? opts.requestId : null;
       const { signal, release } = this._uploadCancelRegistry.register(requestId);
+      let cleanupUpload = null;
       try {
         if (typeof filePath !== "string") {
           return { success: false, error: "Invalid file path" };
@@ -9511,15 +9569,12 @@ class IPCHandlers {
           };
         }
 
-        const audioBuffer = fs.readFileSync(realCloud);
-        const ext = path.extname(realCloud).toLowerCase().replace(".", "");
-        const contentType = AUDIO_MIME_TYPES[ext] || "audio/mpeg";
-        const fileName = path.basename(realCloud);
-
+        const upload = await prepareProviderUpload(realCloud, { signal });
+        cleanupUpload = upload.cleanup;
         const { body, boundary } = buildMultipartBody(
-          audioBuffer,
-          fileName,
-          contentType,
+          fs.readFileSync(upload.path),
+          path.basename(upload.path),
+          providerContentType(upload.path),
           multipartFields
         );
         const url = new URL(`${apiUrl}/api/transcribe`);
@@ -9541,6 +9596,7 @@ class IPCHandlers {
         debugLogger.error("Cloud audio file transcription error", { error: error.message });
         return toPolicyFailure(error);
       } finally {
+        cleanupUpload?.();
         release();
       }
     });
@@ -9573,12 +9629,13 @@ class IPCHandlers {
         }
       ) => {
         const fs = require("fs");
+        let cleanupUpload = null;
         try {
           if (typeof filePath !== "string") {
             return { success: false, error: "Invalid file path" };
           }
-          const realByok = resolveAllowedAudioPath(filePath);
-          if (!realByok) return { success: false, error: "File path not allowed" };
+          const sourcePath = resolveAllowedAudioPath(filePath);
+          if (!sourcePath) return { success: false, error: "File path not allowed" };
 
           const { resolveTranscriptionRoute } = await import("./transcriptionRoute.ts");
           const route = resolveTranscriptionRoute({
@@ -9607,13 +9664,16 @@ class IPCHandlers {
             };
           }
 
+          const upload = await prepareProviderUpload(sourcePath);
+          cleanupUpload = upload.cleanup;
+          const realByok = upload.path;
+
           if (route.transport === "http-batch" && route.provider === "self-hosted") {
             // User's own server, so the 25 MB third-party cap does not apply.
-            const ext = path.extname(realByok).toLowerCase().replace(".", "");
             const { body, boundary } = buildMultipartBody(
               fs.readFileSync(realByok),
               path.basename(realByok),
-              AUDIO_MIME_TYPES[ext] || "audio/mpeg",
+              providerContentType(realByok),
               { model: route.model, language: route.language }
             );
             const data = await postMultipart(new URL(route.endpoint), body, boundary);
@@ -9651,11 +9711,10 @@ class IPCHandlers {
           }
 
           if (route.transport === "proxied" && route.provider === "tinfoil") {
-            const ext = path.extname(realByok).toLowerCase().replace(".", "");
             const { text } = await transcribeWithTinfoil({
               audioBuffer: fs.readFileSync(realByok),
               fileName: path.basename(realByok),
-              contentType: AUDIO_MIME_TYPES[ext] || "audio/mpeg",
+              contentType: providerContentType(realByok),
               language: route.language,
               apiKey: this.environmentManager.getTinfoilKey(),
             });
@@ -9663,13 +9722,12 @@ class IPCHandlers {
           }
 
           if (route.transport === "proxied" && route.provider === "gemini") {
-            const ext = path.extname(realByok).toLowerCase().replace(".", "");
             // Deliberately no language hint — same rationale as the multipart
             // branch below, and Gemini's language_codes is a hard constraint.
             const { text } = await transcribeWithGemini({
               audioBuffer: fs.readFileSync(realByok),
               model: route.model,
-              contentType: AUDIO_MIME_TYPES[ext] || "audio/mpeg",
+              contentType: providerContentType(realByok),
               apiKey: apiKey || this.environmentManager.getGeminiKey(),
             });
             return { success: true, text };
@@ -9680,8 +9738,7 @@ class IPCHandlers {
           }
 
           const audioBuffer = fs.readFileSync(realByok);
-          const ext = path.extname(realByok).toLowerCase().replace(".", "");
-          const contentType = AUDIO_MIME_TYPES[ext] || "audio/mpeg";
+          const contentType = providerContentType(realByok);
           const fileName = path.basename(realByok);
 
           // mistral/xai have no OpenAI-compatible endpoint — talk to them
@@ -9806,6 +9863,8 @@ class IPCHandlers {
             code: error.code,
             messageKey: error.messageKey,
           };
+        } finally {
+          cleanupUpload?.();
         }
       }
     );
@@ -11192,8 +11251,6 @@ class IPCHandlers {
       }
     });
 
-    registerMeetingAutoEndLifecycleHandlers(ipcMain, () => this.meetingDetectionEngine);
-
     ipcMain.handle("join-calendar-meeting", async (_event, eventId) => {
       try {
         await this.meetingDetectionEngine.joinCalendarMeeting(eventId);
@@ -11202,6 +11259,8 @@ class IPCHandlers {
         return { success: false, error: error.message };
       }
     });
+
+    ipcMain.handle("start-manual-meeting", () => this.windowManager.startManualMeeting());
 
     ipcMain.handle("get-meeting-notification-data", async () => {
       return this.windowManager?._pendingNotificationData ?? null;
